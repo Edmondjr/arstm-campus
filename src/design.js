@@ -1,0 +1,44 @@
+export const C = {
+  bg:"#f0f4f8", surface:"#ffffff", surfaceAlt:"#f8fafc",
+  border:"#e2e8f0", navy:"#0f172a", dark:"#1e293b", mid:"#475569", muted:"#94a3b8",
+  blue:"#2563eb", blueLight:"#eff6ff", blueBorder:"#bfdbfe",
+  aqua:"#0891b2", aquaLight:"#ecfeff",
+  green:"#059669", greenLight:"#f0fdf4", greenBorder:"#bbf7d0",
+  gold:"#d97706", goldLight:"#fffbeb", goldBorder:"#fde68a",
+  red:"#dc2626", redLight:"#fef2f2", redBorder:"#fecaca",
+  purple:"#7c3aed", purpleLight:"#faf5ff", purpleBorder:"#ddd6fe",
+};
+
+export const ROLES = [
+  { id:"etudiant",       icon:"🎓", label:"Étudiant",        desc:"Licence ou Master ARSTM",       color:"#2563eb", bg:"#eff6ff" },
+  { id:"enseignant",     icon:"📖", label:"Enseignant",       desc:"Corps professoral ARSTM",       color:"#059669", bg:"#f0fdf4" },
+  { id:"alumni",         icon:"🏅", label:"Alumni",           desc:"Ancien étudiant diplômé",       color:"#d97706", bg:"#fffbeb" },
+  { id:"administration", icon:"🏫", label:"Administration",   desc:"Scolarité / Direction ARSTM",   color:"#7c3aed", bg:"#faf5ff" },
+  { id:"superadmin",     icon:"⚙️", label:"Admin Plateforme", desc:"Gestionnaire de l'application", color:"#dc2626", bg:"#fef2f2" },
+];
+
+export const css = {
+  app:{ minHeight:"100vh", background:"#f0f4f8", color:"#1e293b", fontFamily:"'DM Sans',sans-serif", fontSize:14 },
+  nav:{ position:"sticky", top:0, zIndex:200, background:"#fff", borderBottom:"1px solid #e2e8f0", boxShadow:"0 1px 3px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:56 },
+  logo:{ display:"flex", alignItems:"center", gap:9, fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", letterSpacing:"-0.02em", color:"#0f172a" },
+  logoBox:{ width:32, height:32, borderRadius:8, background:"linear-gradient(135deg,#2563eb,#0891b2)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:"0.85rem" },
+  tabs:{ display:"flex", gap:2 },
+  tab:(a)=>({ padding:"6px 12px", borderRadius:7, fontSize:"0.82rem", fontWeight:500, cursor:"pointer", border:"none", background:a?"#eff6ff":"transparent", color:a?"#2563eb":"#475569", fontFamily:"inherit", transition:"all 0.15s" }),
+  userPill:{ display:"flex", alignItems:"center", gap:8, padding:"5px 10px 5px 6px", borderRadius:20, background:"#f8fafc", border:"1px solid #e2e8f0" },
+  card:{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:14, padding:20, transition:"all 0.18s" },
+  cardSm:{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:16 },
+  pageH:{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.45rem", color:"#0f172a", letterSpacing:"-0.02em", marginBottom:2 },
+  pageSub:{ color:"#94a3b8", fontSize:"0.84rem", marginBottom:20 },
+  h3:{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"1rem", color:"#0f172a", marginBottom:4 },
+  label:{ fontSize:"0.72rem", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em", color:"#94a3b8", marginBottom:8, display:"block" },
+  badge:(bg,fg)=>({ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:100, fontSize:"0.72rem", fontWeight:600, background:bg, color:fg }),
+  tag:(bg,fg)=>({ display:"inline-block", padding:"2px 8px", borderRadius:6, fontSize:"0.72rem", fontWeight:600, background:bg, color:fg }),
+  btnPrimary:{ padding:"9px 18px", borderRadius:8, background:"#2563eb", color:"#fff", border:"none", fontWeight:600, fontSize:"0.84rem", cursor:"pointer", fontFamily:"inherit" },
+  btnSecondary:{ padding:"8px 16px", borderRadius:8, background:"#f8fafc", color:"#1e293b", border:"1px solid #e2e8f0", fontWeight:500, fontSize:"0.84rem", cursor:"pointer", fontFamily:"inherit" },
+  btnGhost:{ padding:"6px 12px", borderRadius:8, background:"transparent", color:"#475569", border:"none", fontWeight:500, fontSize:"0.82rem", cursor:"pointer", fontFamily:"inherit" },
+  btnSm:{ padding:"5px 11px", borderRadius:7, background:"#eff6ff", color:"#2563eb", border:"1px solid #bfdbfe", fontWeight:600, fontSize:"0.76rem", cursor:"pointer", fontFamily:"inherit" },
+  btnDanger:{ padding:"8px 16px", borderRadius:8, background:"#fef2f2", color:"#dc2626", border:"1px solid #fecaca", fontWeight:600, fontSize:"0.84rem", cursor:"pointer", fontFamily:"inherit" },
+  input:{ width:"100%", padding:"9px 13px", borderRadius:9, border:"1px solid #e2e8f0", fontSize:"0.88rem", background:"#fff", color:"#1e293b", outline:"none", boxSizing:"border-box", fontFamily:"inherit" },
+  divider:{ height:1, background:"#e2e8f0", margin:"14px 0" },
+  avatar:(bg,fg,sz=36)=>({ width:sz, height:sz, borderRadius:"50%", background:bg, color:fg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:sz*0.32+"rem", fontWeight:700, flexShrink:0 }),
+};

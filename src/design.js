@@ -40,5 +40,13 @@ export const css = {
   btnDanger:{ padding:"8px 16px", borderRadius:8, background:"#fef2f2", color:"#dc2626", border:"1px solid #fecaca", fontWeight:600, fontSize:"0.84rem", cursor:"pointer", fontFamily:"inherit" },
   input:{ width:"100%", padding:"9px 13px", borderRadius:9, border:"1px solid #e2e8f0", fontSize:"0.88rem", background:"#fff", color:"#1e293b", outline:"none", boxSizing:"border-box", fontFamily:"inherit" },
   divider:{ height:1, background:"#e2e8f0", margin:"14px 0" },
-  avatar:(bg,fg,sz=36)=>({ width:sz, height:sz, borderRadius:"50%", background:bg, color:fg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:sz*0.32+"rem", fontWeight:700, flexShrink:0 }),
+  avatar:(bg,fg,sz=36)=>({ 
+    width:sz, height:sz, borderRadius:"50%", 
+    background:bg, color:fg, 
+    display:"flex", alignItems:"center", justifyContent:"center", 
+    fontSize: sz <= 28 ? "0.58rem" : sz <= 36 ? "0.72rem" : "1rem",
+    fontWeight:600, 
+    flexShrink:0,
+    overflow:"hidden",
+    lineHeight:1,}),
 };

@@ -147,27 +147,31 @@ export default function App() {
         </footer>
       )}
 
-      {/* ── MOBILE BOTTOM NAV ── */}
-      {isMobile && (
-        <nav style={{ flexShrink:0, background:"#fff", borderTop:`1px solid ${C.border}`,
-          display:"flex", height:58, boxShadow:"0 -2px 10px rgba(0,0,0,0.07)" }}>
-          {navBottom.map(([id, icon, label]) => {
-            const isMore = id === "more";
-            const active = isMore ? drawer : page === id;
-            return (
-              <button key={id} onClick={()=>isMore?setDrawer(!drawer):goTo(id)}
-                style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center",
-                  justifyContent:"center", gap:2, border:"none", background:"transparent",
-                  cursor:"pointer", fontFamily:"inherit",
-                  borderTop:active?`2px solid ${C.blue}`:"2px solid transparent" }}>
-                <span style={{ fontSize:"1.15rem", lineHeight:1 }}>{icon}</span>
-                <span style={{ fontSize:"0.6rem", fontWeight:600,
-                  color:active?C.blue:C.muted }}>{label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
+     {/* ── MOBILE BOTTOM NAV ── */}
+{isMobile && (
+  <nav style={{ 
+    position:"fixed", bottom:0, left:0, right:0, zIndex:500,
+    background:"#fff", borderTop:`1px solid ${C.border}`,
+    display:"flex", height:58, 
+    boxShadow:"0 -2px 10px rgba(0,0,0,0.07)" 
+  }}>
+    {navBottom.map(([id, icon, label]) => {
+      const isMore = id === "more";
+      const active = isMore ? drawer : page === id;
+      return (
+        <button key={id} onClick={()=>isMore?setDrawer(!drawer):goTo(id)}
+          style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center",
+            justifyContent:"center", gap:2, border:"none", background:"transparent",
+            cursor:"pointer", fontFamily:"inherit",
+            borderTop:active?`2px solid ${C.blue}`:"2px solid transparent" }}>
+          <span style={{ fontSize:"1.15rem", lineHeight:1 }}>{icon}</span>
+          <span style={{ fontSize:"0.6rem", fontWeight:600,
+            color:active?C.blue:C.muted }}>{label}</span>
+        </button>
+      );
+    })}
+  </nav>
+)}
 
       {/* ── DRAWER PLUS ── */}
       {isMobile && drawer && (
@@ -200,3 +204,6 @@ export default function App() {
     </div>
   );
 }
+<main style={{ flex:1, overflowY:"auto", 
+  padding:isMobile?"14px 12px":"24px 16px",
+  paddingBottom: isMobile ? "72px" : undefined }}></main>

@@ -1,4 +1,3 @@
-// src/pages/Profil.jsx
 import { useState } from "react";
 import { C, ROLES, css } from "../design";
 import { updateDocument } from "../hooks/useFirestore";
@@ -7,12 +6,14 @@ export default function PageProfil({ profile, onLogout, setPage }) {
   const [editMode, setEditMode] = useState(false);
   const [bio, setBio]           = useState(profile?.bio || "");
   const [saving, setSaving]     = useState(false);
+  const [photoURL, setPhotoURL] = useState(profile?.photoURL || null);
+  const [uploading, setUploading] = useState(false);
 
   const roleInfo = ROLES.find(r => r.id === profile?.role) || ROLES[0];
-  const initials = profile?.avatar || profile?.name?.slice(0,2)?.toUpperCase() || "?";
+  const initials = profile?.avatar || profile?.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() || "?";
 
   const statsMap = {
-    etudiant:       [["📅","Cours suivis",42],[" 📚","Ressources DL",24],["💬","Posts",7],["💼","Offres vues",12]],
+    etudiant:       [["📅","Cours suivis",42],["📚","Ressources DL",24],["💬","Posts",7],["💼","Offres vues",12]],
     enseignant:     [["📖","Cours déposés",18],["🎓","Étudiants",156],["📢","Annonces",5],["📋","Modules",3]],
     alumni:         [["💼","Offres publiées",3],["💡","Conseils",7],["⭐","Recommandations",4],["🤝","Mentorés",2]],
     administration: [["📢","Annonces",24],["👥","Comptes",342],["📁","Docs",67],["📅","EDT",8]],
@@ -27,20 +28,57 @@ export default function PageProfil({ profile, onLogout, setPage }) {
     setEditMode(false);
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      setPhotoURL(base64);
+      await updateDocument("users", profile?.uid, { photoURL: base64 });
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+
   return (
     <div style={{ maxWidth:680, margin:"0 auto" }}>
       <div style={css.pageH}>Mon Profil</div>
-      <div style={css.pageSub}>{profile?.promo} · {roleInfo.label}</div>
+      <div style={css.pageSub}>{profile?.promo || roleInfo.label} · {roleInfo.label}</div>
 
       {/* Carte identité */}
       <div style={{ ...css.card, marginBottom:18 }}>
         <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap" }}>
-          <div style={{ width:70, height:70, borderRadius:"50%",
-            background:`linear-gradient(135deg,${roleInfo.color},${C.aqua})`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:"1.5rem", fontWeight:800, color:"#fff", flexShrink:0 }}>
-            {initials}
+
+          {/* Avatar avec upload */}
+          <div style={{ position:"relative", width:72, height:72, flexShrink:0 }}>
+            <div style={{ width:72, height:72, borderRadius:"50%",
+              background:`linear-gradient(135deg,${roleInfo.color},${C.aqua})`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"1.3rem", fontWeight:700, color:"#fff", overflow:"hidden" }}>
+              {photoURL
+                ? <img src={photoURL} alt="avatar"
+                    style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                : initials
+              }
+            </div>
+            {/* Bouton upload */}
+            <label style={{ position:"absolute", bottom:0, right:0,
+              width:24, height:24, borderRadius:"50%",
+              background:C.blue, color:"#fff",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"0.7rem", cursor:"pointer",
+              border:"2px solid #fff",
+              boxShadow:"0 2px 6px rgba(0,0,0,0.2)" }}>
+              {uploading ? "⏳" : "📷"}
+              <input type="file" accept="image/*"
+                style={{ display:"none" }}
+                onChange={handlePhotoUpload} />
+            </label>
           </div>
+
           <div style={{ flex:1, minWidth:180 }}>
             <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.15rem",
               color:C.navy, marginBottom:2 }}>{profile?.name}</div>
@@ -51,12 +89,15 @@ export default function PageProfil({ profile, onLogout, setPage }) {
               <span style={css.badge(roleInfo.bg, roleInfo.color)}>
                 {roleInfo.icon} {roleInfo.label}
               </span>
-              {profile?.promo && <span style={css.badge(C.blueLight, C.blue)}>{profile.promo}</span>}
+              {profile?.promo && (
+                <span style={css.badge(C.blueLight, C.blue)}>{profile.promo}</span>
+              )}
             </div>
           </div>
+
           <button style={{ ...css.btnSecondary, fontSize:"0.8rem" }}
             onClick={()=>editMode ? saveBio() : setEditMode(true)}>
-            {saving?"⏳":editMode?"✅ Sauvegarder":"✏️ Modifier"}
+            {saving ? "Sauvegarde..." : editMode ? "✅ Sauvegarder" : "✏️ Modifier"}
           </button>
         </div>
 
@@ -68,7 +109,7 @@ export default function PageProfil({ profile, onLogout, setPage }) {
             placeholder="Présentez-vous en quelques mots..." />
         ) : (
           <p style={{ fontSize:"0.87rem", lineHeight:1.7, color:C.dark }}>
-            {bio || `Compte ${roleInfo.label} — ${profile?.promo||""}`}
+            {bio || `Compte ${roleInfo.label}${profile?.promo ? ` — ${profile.promo}` : ""}`}
           </p>
         )}
       </div>
@@ -78,13 +119,13 @@ export default function PageProfil({ profile, onLogout, setPage }) {
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
         {stats.map(([icon,label,value],i) => (
           <div key={i} style={{ ...css.cardSm, display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:38, height:38, borderRadius:9, background:`${roleInfo.color}15`,
-              display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem", flexShrink:0 }}>
-              {icon}
-            </div>
+            <div style={{ width:38, height:38, borderRadius:9,
+              background:`${roleInfo.color}15`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"1rem", flexShrink:0 }}>{icon}</div>
             <div>
-              <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.2rem",
-                color:roleInfo.color, lineHeight:1 }}>{value}</div>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800,
+                fontSize:"1.2rem", color:roleInfo.color, lineHeight:1 }}>{value}</div>
               <div style={{ fontSize:"0.72rem", color:C.muted, marginTop:2 }}>{label}</div>
             </div>
           </div>
@@ -94,11 +135,15 @@ export default function PageProfil({ profile, onLogout, setPage }) {
       {/* Paramètres */}
       <span style={{ ...css.label, display:"block" }}>Paramètres</span>
       <div style={{ ...css.card, marginBottom:18 }}>
-        {[["🔔","Notifications push","Activées"],["🌙","Thème","Clair"],
-          ["🔒","Confidentialité","Promo uniquement"],["📧","Email",profile?.email||"—"]
+        {[
+          ["🔔","Notifications push","Activées"],
+          ["🌙","Thème","Clair"],
+          ["🔒","Confidentialité","Promo uniquement"],
+          ["📧","Email", profile?.email||"—"],
         ].map(([icon,label,value],i,arr) => (
-          <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-            padding:"11px 0", borderBottom:i<arr.length-1?`1px solid ${C.border}`:"none" }}>
+          <div key={i} style={{ display:"flex", alignItems:"center",
+            justifyContent:"space-between", padding:"11px 0",
+            borderBottom:i<arr.length-1?`1px solid ${C.border}`:"none" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <span>{icon}</span>
               <span style={{ fontSize:"0.87rem", color:C.dark }}>{label}</span>
@@ -108,9 +153,11 @@ export default function PageProfil({ profile, onLogout, setPage }) {
         ))}
       </div>
 
-      <button style={{ width:"100%", padding:"10px", borderRadius:9, background:C.redLight,
-        color:C.red, border:`1px solid ${C.redBorder}`, fontWeight:600, fontSize:"0.88rem",
-        cursor:"pointer", fontFamily:"inherit" }} onClick={onLogout}>
+      <button style={{ width:"100%", padding:"10px", borderRadius:9,
+        background:C.redLight, color:C.red,
+        border:`1px solid ${C.redBorder}`, fontWeight:600,
+        fontSize:"0.88rem", cursor:"pointer", fontFamily:"inherit" }}
+        onClick={onLogout}>
         🚪 Se déconnecter
       </button>
     </div>

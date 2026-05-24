@@ -29,9 +29,12 @@ export function useEDT(promo) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!promo) { setLoading(false); return; }
-    const q = query(collection(db, "edt"),
-      where("promo", "==", promo), orderBy("heureDebut"));
+    // Si pas de promo → charger TOUS les cours
+    const ref = collection(db, "edt");
+    const q   = promo
+      ? query(ref, where("promo", "==", promo), orderBy("heureDebut"))
+      : query(ref, orderBy("heureDebut"));
+
     const unsub = onSnapshot(q, (snap) => {
       const grouped = {};
       snap.docs.forEach(d => {
@@ -41,7 +44,7 @@ export function useEDT(promo) {
       });
       setEdt(grouped);
       setLoading(false);
-    });
+    }, () => setLoading(false));
     return unsub;
   }, [promo]);
 

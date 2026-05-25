@@ -48,7 +48,7 @@ export default function App() {
   const { user, profile, logout } = useAuth();
   const [page, setPage]   = useState("accueil");
   const [drawer, setDrawer] = useState(false);
-  const [winW, setWinW]   = useState(window.innerWidth);
+  const [winW, setWinW]   = useState(typeof window !== "undefined" ? window.innerWidth : 800);
 
   useEffect(() => {
     const l = document.createElement("link");

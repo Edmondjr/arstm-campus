@@ -46,14 +46,8 @@ export function AuthProvider({ children }) {
       if (data.status === "pending")  { await signOut(auth); throw new Error("PENDING"); }
       if (data.status === "rejected") { await signOut(auth); throw new Error("REJECTED"); }
       setProfile(data);
-      setUser(cred.user);
     }
     return cred.user;
-  }
-
-  async function reloadProfile(uid) {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (snap.exists()) setProfile(snap.data());
   }
 
   async function logout() {
@@ -63,7 +57,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, register, login, logout, reloadProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, register, login, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

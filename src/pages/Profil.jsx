@@ -41,7 +41,6 @@ export default function PageProfil({ profile, onLogout, setPage }) {
     };
     reader.readAsDataURL(file);
   };
-  
 
   return (
     <div style={{ maxWidth:680, margin:"0 auto" }}>

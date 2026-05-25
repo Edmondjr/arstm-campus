@@ -215,12 +215,13 @@ export default function Login() {
                     <option value="">Choisir une filière...</option>
                     <optgroup label="Licence Pro Transport Maritime et Logistique (LPTML)">
                       <option value="LPTML - Port Manutention">LPTML — Port Manutention</option>
-                      <option value="LPTML - Transit Consignation Armement">LPTML — Transit Consignation Armement</option>
+                      <option value="LPTML - Transit et Consignation">LPTML — Transit et Consignation</option>
+                      <option value="LPTML - Armement">LPTML — Armement</option>
                       <option value="LPTML - Transport Multimodal">LPTML — Transport Multimodal</option>
                     </optgroup>
                     <optgroup label="Master Pro Transport Maritime et Logistique (MPTML)">
                       <option value="MPTML - Gestion Maritime et Portuaire">MPTML — Gestion Maritime et Portuaire</option>
-                      <option value="MPTML - Logistique et Transport">MPTML — Logistique Transport</option>
+                      <option value="MPTML - Logistique et Transport">MPTML — Logistique et Transport</option>
                     </optgroup>
                     <optgroup label="Sciences Nautiques">
                       <option value="LPSN">Licence Pro Sciences Nautiques (LPSN)</option>
@@ -264,30 +265,15 @@ export default function Login() {
                   <select style={{ ...css.input, background:C.surfaceAlt, marginBottom:8 }}
                     value={form.filiere} onChange={e=>setForm({...form,filiere:e.target.value})}>
                     <option value="">Choisir une filière...</option>
-                    <optgroup label="Licence Pro Transport Maritime et Logistique (LPTML)">
-                      <option value="LPTML - Port Manutention">LPTML — Port Manutention</option>
-                      <option value="LPTML - Transit Consignation Armement">LPTML — Transit Consignation Armement</option>
-                      <option value="LPTML - Transport Multimodal">LPTML — Transport Multimodal</option>
-                    </optgroup>
-                    <optgroup label="Master Pro Transport Maritime et Logistique (MPTML)">
-                      <option value="MPTML - Gestion Maritime et Portuaire">MPTML — Gestion Maritime et Portuaire</option>
-                      <option value="MPTML - Logistique et Transport">MPTML — Logistique Transport</option>
-                    </optgroup>
-                    <optgroup label="Sciences Nautiques">
-                      <option value="LPSN">Licence Pro Sciences Nautiques (LPSN)</option>
-                      <option value="MPSN">Master Pro Sciences Nautiques (MPSN)</option>
-                    </optgroup>
-                    <optgroup label="Mecanique Navale">
-                      <option value="LPMN">Licence Pro Mecanique Navale (LPMN)</option>
-                      <option value="MPMN">Master Pro Mecanique Navale (MPMN)</option>
-                    </optgroup>
-                    <optgroup label="Autres formations">
-                      <option value="CEAM">CEAM — Certificats Maritimes</option>
-                      <option value="FOAD">Formation a Distance (FOAD)</option>
-                      <option value="FC">Formation Continue et Professionnelle</option>
-                    </optgroup>
+                    <option value="LPTML">LPTML</option>
+                    <option value="MPTML">MPTML</option>
+                    <option value="LPSN">LPSN</option>
+                    <option value="MPSN">MPSN</option>
+                    <option value="LPMN">LPMN</option>
+                    <option value="MPMN">MPMN</option>
+                    <option value="CEAM">CEAM</option>
                   </select>
-                  <span style={css.label}>Promotion</span>
+                  <span style={css.label}>Promotion de sortie</span>
                   <select style={{ ...css.input, background:C.surfaceAlt }}
                     value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})}>
                     <option value="">Sélectionner...</option>
@@ -305,11 +291,12 @@ export default function Login() {
                   <select style={{ ...css.input, background:C.surfaceAlt }}
                     value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})}>
                     <option value="">Sélectionner...</option>
-                    <option>Direction Générale</option>
-                    <option>Scolarité</option>
-                    <option>Comptabilité et Finances</option>
+                    <option>Direction Generale</option>
+                    <option>Direction Academique</option>
+                    <option>Scolarite</option>
+                    <option>Comptabilite et Finances</option>
                     <option>Communication et Marketing</option>
-                    <option>Surveillance Générale</option>
+                    <option>Relations Exterieures</option>
                     <option>Ressources Humaines</option>
                     <option>ESTM</option>
                     <option>ESN</option>

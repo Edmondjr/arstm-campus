@@ -12,6 +12,7 @@ import PageAlumni from "./pages/Alumni";
 import PageProfil from "./pages/Profil";
 import PageAide from "./pages/Aide";
 import PageAdmin from "./pages/Admin";
+import PageMessages from "./pages/Messages";
 
 // ── Modes disponibles pour le SuperAdmin ──
 const SUPER_MODES = [
@@ -67,6 +68,7 @@ export default function App() {
   const [winW, setWinW]       = useState(typeof window !== "undefined" ? window.innerWidth : 800);
   const [activeMode, setActiveMode] = useState(null); // Mode actif pour SuperAdmin
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
 
   useEffect(() => {
     const l = document.createElement("link");
@@ -299,6 +301,37 @@ export default function App() {
           })}
         </nav>
       )}
+
+      {/* ── BOUTON FLOTTANT MESSAGES ── */}
+      {profile.role !== "superadmin" || (activeMode && activeMode !== "control" && activeMode !== "support") ? (
+        <>
+          <button onClick={()=>setShowMessages(!showMessages)}
+            style={{ position:"fixed", bottom: isMobile ? 72 : 24, right:16, zIndex:800,
+              width:50, height:50, borderRadius:"50%",
+              background:`linear-gradient(135deg,${C.blue},${C.aqua})`,
+              color:"#fff", border:"none", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"1.3rem", boxShadow:"0 4px 16px rgba(37,99,235,0.4)",
+              transition:"transform 0.2s",
+              transform: showMessages ? "scale(0.9)" : "scale(1)" }}>
+            {showMessages ? "✕" : "💬"}
+          </button>
+          {showMessages && (
+            <>
+              <div onClick={()=>setShowMessages(false)}
+                style={{ position:"fixed", inset:0, zIndex:799,
+                  background:"rgba(0,0,0,0.15)" }} />
+              <div style={{ position:"fixed", bottom: isMobile ? 132 : 84,
+                right:16, zIndex:800, width: isMobile ? "calc(100vw - 32px)" : 380,
+                height: isMobile ? "70vh" : 520 }}>
+                <PageMessages profile={profile}
+                  onClose={()=>setShowMessages(false)}
+                  floating={true} />
+              </div>
+            </>
+          )}
+        </>
+      ) : null}
 
       {/* ── DRAWER PLUS ── */}
       {isMobile && drawer && (

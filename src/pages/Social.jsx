@@ -3,6 +3,7 @@ import { useState } from "react";
 import { C, css } from "../design";
 import { usePosts, addDocument, updateDocument } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
+import PageMessages from "./Messages";
 
 export default function PageSocial({ profile }) {
   const { user } = useAuth();
@@ -44,12 +45,16 @@ export default function PageSocial({ profile }) {
       <div style={css.pageSub}>{posts.length} publications</div>
 
       <div style={{ display:"flex", gap:8, marginBottom:18 }}>
-        {[["forum","💬 Forum"],["groupes","👥 Groupes"],["parrainage","🤝 Parrainage"]].map(([v,l])=>(
+        {[["forum","💬 Forum"],["messages","✉️ Messages"],["groupes","👥 Groupes"],["parrainage","🤝 Parrainage"]].map(([v,l])=>(
           <button key={v} style={{ ...css.tab(tab===v), borderRadius:10, padding:"7px 16px",
             border:`1px solid ${tab===v?C.blue:C.border}`, fontFamily:"inherit" }}
             onClick={()=>setTab(v)}>{l}</button>
         ))}
       </div>
+
+      {tab==="messages" && (
+        <PageMessages profile={profile} floating={false} />
+      )}
 
       {tab==="forum" && <>
         {/* Composer */}

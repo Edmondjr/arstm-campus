@@ -1,33 +1,92 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { useAuth } from "../AuthContext";
 import { C, ROLES, css } from "../design";
 
+const CODES = [
+  {code:"+225",flag:"🇨🇮",short:"CI"},
+  {code:"+223",flag:"🇲🇱",short:"ML"},
+  {code:"+226",flag:"🇧🇫",short:"BF"},
+  {code:"+228",flag:"🇹🇬",short:"TG"},
+  {code:"+229",flag:"🇧🇯",short:"BJ"},
+  {code:"+224",flag:"🇬🇳",short:"GN"},
+  {code:"+221",flag:"🇸🇳",short:"SN"},
+  {code:"+237",flag:"🇨🇲",short:"CM"},
+  {code:"+242",flag:"🇨🇬",short:"CG"},
+  {code:"+243",flag:"🇨🇩",short:"CD"},
+  {code:"+241",flag:"🇬🇦",short:"GA"},
+  {code:"+233",flag:"🇬🇭",short:"GH"},
+  {code:"+234",flag:"🇳🇬",short:"NG"},
+  {code:"+212",flag:"🇲🇦",short:"MA"},
+  {code:"+33", flag:"🇫🇷",short:"FR"},
+  {code:"+32", flag:"🇧🇪",short:"BE"},
+  {code:"+41", flag:"🇨🇭",short:"CH"},
+  {code:"+1",  flag:"🇺🇸",short:"US"},
+  {code:"+44", flag:"🇬🇧",short:"GB"},
+];
+
+const ECOLES = ["ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"];
+
+// ── Composant téléphone compact ──
+const PhoneInput = memo(({ label, tel, setTel, code, setCode, style={} }) => (
+  <div style={{ marginBottom:12, ...style }}>
+    {label && <span style={css.label}>{label}</span>}
+    <div style={{ display:"flex", gap:6 }}>
+      <select value={code} onChange={e=>setCode(e.target.value)}
+        style={{ ...css.input, background:C.surfaceAlt, width:80, flexShrink:0, padding:"8px 4px", fontSize:"0.85rem" }}>
+        {CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+      </select>
+      <input style={{ ...css.input, background:C.surfaceAlt, flex:1 }}
+        type="tel" placeholder="07 XX XX XX XX"
+        value={tel} onChange={e=>setTel(e.target.value)} />
+    </div>
+  </div>
+));
+
 export default function Login() {
-  const { login, register }   = useAuth();
+  const { login, register } = useAuth();
   const [vue, setVue]         = useState("login");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
-  const [email, setEmail]     = useState("");
-  const [pwd, setPwd]         = useState("");
-  const [showPwd, setShow]    = useState(false);
+
+  // Connexion
+  const [email, setEmail]   = useState("");
+  const [pwd, setPwd]       = useState("");
+  const [showPwd, setShow]  = useState(false);
+
+  // Inscription
   const [regRole, setRegRole] = useState(null);
   const [regStep, setRegStep] = useState(1);
-  const [regOk, setRegOk]     = useState(false);
-  const [form, setForm]       = useState({
-    nom:"", prenom:"", email:"", filiere:"", promo:"", password:"", confirm:""
-  });
+  const [regOk, setRegOk]   = useState(false);
+  const [nom, setNom]         = useState("");
+  const [prenom, setPrenom]   = useState("");
+  const [emailR, setEmailR]   = useState("");
+  const [filiere, setFiliere] = useState("");
+  const [promo, setPromo]     = useState("");
+  const [service, setService] = useState("");
+  const [modules, setModules] = useState("");
+  const [ecoles, setEcoles]   = useState([]);
+  const [ecoleAutre, setEcoleAutre] = useState("");
+  const [employeur, setEmployeur]   = useState("");
+  const [poste, setPoste]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [confirm, setConfirm]       = useState("");
+  const [telCode, setTelCode]       = useState("+225");
+  const [telNum, setTelNum]         = useState("");
+  const [waCode, setWaCode]         = useState("+225");
+  const [waNum, setWaNum]           = useState("");
+  const [waSame, setWaSame]         = useState(true);
 
-  const roleInfo = ROLES.find(r => r.id === regRole) || {};
+  const roleInfo = ROLES.find(r=>r.id===regRole) || {};
+  const toggleEcole = e => setEcoles(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e]);
 
   const handleLogin = async () => {
     setError("");
-    if (!email || !pwd) { setError("Veuillez remplir tous les champs."); return; }
+    if (!email||!pwd) { setError("Remplissez tous les champs."); return; }
     setLoading(true);
-    try {
-      await login(email.trim(), pwd);
-    } catch(e) {
-      if (e.message === "PENDING") setError("Compte en attente de validation par l'Admin Plateforme.");
-      else if (e.message === "REJECTED") setError("Compte refusé. Contactez support@arstm-campus.ci");
+    try { await login(email.trim(), pwd); }
+    catch(e) {
+      if (e.message==="PENDING")   setError("Compte en attente de validation.");
+      else if (e.message==="REJECTED") setError("Compte refusé. Contactez le support.");
       else setError("Email ou mot de passe incorrect.");
       setLoading(false);
     }
@@ -35,331 +94,436 @@ export default function Login() {
 
   const handleRegister = async () => {
     setError("");
-    const { nom, prenom, email, password, confirm, promo, filiere } = form;
-    if (!nom || !prenom || !email || !password) { setError("Tous les champs sont obligatoires."); return; }
-    if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return; }
-    if (password.length < 6) { setError("Mot de passe trop court (min. 6 caractères)."); return; }
+    if (!nom||!prenom||!emailR||!password) { setError("Champs obligatoires manquants."); return; }
+    if (password!==confirm) { setError("Les mots de passe ne correspondent pas."); return; }
+    if (password.length<6)  { setError("Mot de passe trop court (min. 6 car.)."); return; }
+    if (!telNum) { setError("Le numéro de téléphone est obligatoire."); return; }
+    const telFull = `${telCode}${telNum.replace(/\s/g,"")}`;
+    const waFull  = waSame ? telFull : `${waCode}${waNum.replace(/\s/g,"")}`;
     setLoading(true);
     try {
-      await register({ email: email.trim(), password, nom, prenom, role: regRole, promo, filiere });
+      await register({
+        email:emailR.trim(), password, nom, prenom, role:regRole,
+        promo:promo||service||modules, filiere,
+        tel:telFull, whatsapp:waFull,
+        modules, ecoles, ecoleAutre, employeur, poste, service,
+      });
       setRegOk(true);
     } catch(e) {
-      setError(e.code === "auth/email-already-in-use" ? "Cet email est déjà utilisé." : "Erreur lors de la création.");
+      setError(e.code==="auth/email-already-in-use"?"Cet email est déjà utilisé.":"Erreur lors de la création.");
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
+  const reset = () => {
     setVue("login"); setRegOk(false); setRegStep(1); setRegRole(null);
-    setForm({ nom:"", prenom:"", email:"", filiere:"", promo:"", password:"", confirm:"" });
+    setNom(""); setPrenom(""); setEmailR(""); setFiliere(""); setPromo("");
+    setService(""); setModules(""); setEcoles([]); setEcoleAutre("");
+    setEmployeur(""); setPoste(""); setPassword(""); setConfirm("");
+    setTelNum(""); setWaNum(""); setWaSame(true);
+  };
+
+  // Champs spécifiques au rôle
+  const RoleSection = () => {
+    if (regRole==="etudiant") return (
+      <>
+        <div style={{ marginBottom:10 }}>
+          <span style={css.label}>Filière</span>
+          <select style={{ ...css.input, background:C.surfaceAlt }} value={filiere} onChange={e=>setFiliere(e.target.value)}>
+            <option value="">Choisir...</option>
+            <optgroup label="LPTML">
+              <option value="LPTML - Port Manutention">Port Manutention</option>
+              <option value="LPTML - Transit et Consignation">Transit et Consignation</option>
+              <option value="LPTML - Armement">Armement</option>
+              <option value="LPTML - Transport Multimodal">Transport Multimodal</option>
+            </optgroup>
+            <optgroup label="MPTML">
+              <option value="MPTML - Gestion Maritime et Portuaire">Gestion Maritime et Portuaire</option>
+              <option value="MPTML - Logistique et Transport">Logistique et Transport</option>
+            </optgroup>
+            <optgroup label="Sciences Nautiques">
+              <option value="LPSN">Licence (LPSN)</option>
+              <option value="MPSN">Master (MPSN)</option>
+            </optgroup>
+            <optgroup label="Mecanique Navale">
+              <option value="LPMN">Licence (LPMN)</option>
+              <option value="MPMN">Master (MPMN)</option>
+            </optgroup>
+            <optgroup label="Autres">
+              <option value="CEAM">CEAM</option>
+              <option value="FOAD">FOAD</option>
+              <option value="FC">Formation Continue</option>
+            </optgroup>
+          </select>
+        </div>
+        <div style={{ marginBottom:10 }}>
+          <span style={css.label}>Promotion</span>
+          <select style={{ ...css.input, background:C.surfaceAlt }} value={promo} onChange={e=>setPromo(e.target.value)}>
+            <option value="">Choisir...</option>
+            {Array.from({length:40},(_,i)=>i+1).map(n=><option key={n} value={`Promo ${n}`}>Promotion {n}</option>)}
+          </select>
+        </div>
+      </>
+    );
+
+    if (regRole==="enseignant") return (
+      <>
+        <div style={{ marginBottom:10 }}>
+          <span style={css.label}>Module(s)</span>
+          <input style={{ ...css.input, background:C.surfaceAlt }}
+            placeholder="Ex: Droit Maritime, Supply Chain..."
+            value={modules} onChange={e=>setModules(e.target.value)} />
+        </div>
+        <div style={{ marginBottom:10 }}>
+          <span style={css.label}>École(s) / Centre(s)</span>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:6 }}>
+            {ECOLES.map(e=>(
+              <button key={e} type="button" onClick={()=>toggleEcole(e)} style={{
+                padding:"5px 10px", borderRadius:8, cursor:"pointer", fontFamily:"inherit",
+                fontSize:"0.78rem", fontWeight:600, border:"none",
+                background:ecoles.includes(e)?C.green:"#e2e8f0",
+                color:ecoles.includes(e)?"#fff":"#475569",
+                transition:"all 0.15s",
+              }}>{e}</button>
+            ))}
+          </div>
+          <input style={{ ...css.input, background:C.surfaceAlt }}
+            placeholder="Autre (préciser)..."
+            value={ecoleAutre} onChange={e=>setEcoleAutre(e.target.value)} />
+        </div>
+      </>
+    );
+
+    if (regRole==="alumni") return (
+      <>
+        <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+          <div style={{ flex:1 }}>
+            <span style={css.label}>Filière</span>
+            <select style={{ ...css.input, background:C.surfaceAlt }} value={filiere} onChange={e=>setFiliere(e.target.value)}>
+              <option value="">Choisir...</option>
+              {["LPTML","MPTML","LPSN","MPSN","LPMN","MPMN","CEAM","FOAD","FC"].map(f=><option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div style={{ flex:1 }}>
+            <span style={css.label}>Promotion</span>
+            <select style={{ ...css.input, background:C.surfaceAlt }} value={promo} onChange={e=>setPromo(e.target.value)}>
+              <option value="">Choisir...</option>
+              {Array.from({length:40},(_,i)=>i+1).map(n=><option key={n} value={`Promo ${n}`}>P{n}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+          <div style={{ flex:1 }}>
+            <span style={css.label}>Employeur</span>
+            <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel"
+              value={employeur} onChange={e=>setEmployeur(e.target.value)} />
+          </div>
+          <div style={{ flex:1 }}>
+            <span style={css.label}>Poste</span>
+            <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel"
+              value={poste} onChange={e=>setPoste(e.target.value)} />
+          </div>
+        </div>
+      </>
+    );
+
+    if (regRole==="administration") return (
+      <div style={{ marginBottom:10 }}>
+        <span style={css.label}>Service / Direction</span>
+        <select style={{ ...css.input, background:C.surfaceAlt }} value={service} onChange={e=>setService(e.target.value)}>
+          <option value="">Sélectionner...</option>
+          {["Direction Generale","Direction Academique","Scolarite","Comptabilite et Finances",
+            "Communication et Marketing","Relations Exterieures","Ressources Humaines",
+            "ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"].map(s=><option key={s}>{s}</option>)}
+        </select>
+      </div>
+    );
+    return null;
   };
 
   return (
-    <div style={{ minHeight:"100vh", background:`linear-gradient(160deg,${C.navy} 0%,#1e3a5f 55%,#0f2744 100%)`,
-      display:"flex", alignItems:"center", justifyContent:"center", padding:16, overflowY:"auto" }}>
-      <div style={{ width:"100%", maxWidth:440, paddingBottom:24 }}>
+    <div style={{
+      minHeight:"100vh",
+      background:`linear-gradient(160deg,${C.navy} 0%,#1e3a5f 50%,#0f2744 100%)`,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      padding:16, overflowY:"auto",
+    }}>
+      {/* Déco fond */}
+      <div style={{ position:"fixed", top:-80, right:-80, width:300, height:300, borderRadius:"50%", background:"rgba(37,99,235,0.08)", pointerEvents:"none" }} />
+      <div style={{ position:"fixed", bottom:-60, left:-60, width:200, height:200, borderRadius:"50%", background:"rgba(8,145,178,0.06)", pointerEvents:"none" }} />
 
-        {/* Logo */}
-        <div style={{ textAlign:"center", marginBottom:26 }}>
-          <div style={{ width:62, height:62, borderRadius:18,
+      <div style={{ width:"100%", maxWidth:420, paddingBottom:24, position:"relative" }}>
+
+        {/* ── LOGO ── */}
+        <div style={{ textAlign:"center", marginBottom:28 }}>
+          <div style={{
+            width:64, height:64, borderRadius:20,
             background:`linear-gradient(135deg,${C.blue},${C.aqua})`,
             display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:"1.7rem", fontWeight:800, color:"#fff", margin:"0 auto 12px" }}>A</div>
-          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.55rem", color:"#fff" }}>
+            fontSize:"1.8rem", fontWeight:900, color:"#fff",
+            margin:"0 auto 14px",
+            boxShadow:"0 8px 32px rgba(37,99,235,0.4)",
+          }}>A</div>
+          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.6rem", color:"#fff", letterSpacing:"-0.02em" }}>
             ARSTM<span style={{ color:"#67e8f9" }}>Campus</span>
           </div>
-          <div style={{ color:"rgba(255,255,255,0.55)", fontSize:"0.82rem", marginTop:5, fontStyle:"italic" }}>
-            Votre campus. Votre réseau. Votre avenir numérique.
+          <div style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.78rem", marginTop:6, fontStyle:"italic", letterSpacing:"0.01em" }}>
+            Votre campus · Votre réseau · Votre avenir
           </div>
         </div>
 
-        {/* Onglets */}
-        <div style={{ display:"flex", background:"rgba(255,255,255,0.08)", borderRadius:12,
-          padding:4, marginBottom:18, gap:4 }}>
-          {[["login","Se connecter"],["register","Créer un compte"]].map(([v,l]) => (
-            <button key={v} onClick={()=>{ setVue(v); setError(""); setRegStep(1); setRegOk(false); }}
-              style={{ flex:1, padding:"9px 0", borderRadius:9, border:"none", cursor:"pointer",
-                fontFamily:"inherit", fontWeight:600, fontSize:"0.87rem",
-                background:vue===v?"#fff":"transparent",
-                color:vue===v?C.navy:"rgba(255,255,255,0.6)" }}>
-              {l}
-            </button>
+        {/* ── ONGLETS ── */}
+        <div style={{ display:"flex", background:"rgba(255,255,255,0.07)", borderRadius:14, padding:5, marginBottom:20, gap:4 }}>
+          {[["login","Se connecter"],["register","Créer un compte"]].map(([v,l])=>(
+            <button key={v} onClick={()=>{ setVue(v); setError(""); setRegStep(1); setRegOk(false); }} style={{
+              flex:1, padding:"10px 0", borderRadius:10, border:"none", cursor:"pointer",
+              fontFamily:"inherit", fontWeight:700, fontSize:"0.85rem",
+              background:vue===v?"#fff":"transparent",
+              color:vue===v?C.navy:"rgba(255,255,255,0.55)",
+              boxShadow:vue===v?"0 2px 8px rgba(0,0,0,0.12)":"none",
+              transition:"all 0.2s",
+            }}>{l}</button>
           ))}
         </div>
 
         {/* ── CONNEXION ── */}
-        {vue === "login" && (
-          <div style={{ background:"#fff", borderRadius:20, padding:"24px 20px",
-            boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"1.05rem",
-              color:C.navy, marginBottom:3 }}>Bienvenue</div>
-            <div style={{ color:C.muted, fontSize:"0.82rem", marginBottom:18 }}>
-              Connecte-toi à ton espace ARSTM Campus
+        {vue==="login" && (
+          <div style={{ background:"#fff", borderRadius:22, padding:"26px 20px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)" }}>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem", color:C.navy }}>Bienvenue 👋</div>
+              <div style={{ color:C.muted, fontSize:"0.8rem", marginTop:3 }}>Connecte-toi à ton espace ARSTM</div>
             </div>
-            {error && <div style={{ background:C.redLight, border:`1px solid ${C.redBorder}`,
-              borderRadius:9, padding:"9px 13px", marginBottom:12, fontSize:"0.83rem", color:C.red }}>
-              {error}
-            </div>}
+
+            {error && (
+              <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:"10px 13px", marginBottom:14, fontSize:"0.82rem", color:"#dc2626", display:"flex", alignItems:"center", gap:8 }}>
+                ⚠️ {error}
+              </div>
+            )}
+
             <div style={{ marginBottom:12 }}>
               <span style={css.label}>Email</span>
-              <input style={{ ...css.input, background:C.surfaceAlt }} type="email"
-                placeholder="prenom@arstm.ci" value={email}
-                onChange={e=>{ setEmail(e.target.value); setError(""); }} />
+              <input style={{ ...css.input, background:"#f8fafc" }} type="email" placeholder="prenom@arstm.ci"
+                value={email} onChange={e=>{ setEmail(e.target.value); setError(""); }} />
             </div>
-            <div style={{ marginBottom:18 }}>
+
+            <div style={{ marginBottom:22 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
                 <span style={css.label}>Mot de passe</span>
-                <button style={{ ...css.btnGhost, padding:0, fontSize:"0.77rem", color:C.blue }}>
-                  Oublié ?
-                </button>
+                <button style={{ background:"none", border:"none", cursor:"pointer", color:C.blue, fontSize:"0.76rem", fontFamily:"inherit", padding:0 }}>Oublié ?</button>
               </div>
               <div style={{ position:"relative" }}>
-                <input style={{ ...css.input, background:C.surfaceAlt, paddingRight:38 }}
+                <input style={{ ...css.input, background:"#f8fafc", paddingRight:40 }}
                   type={showPwd?"text":"password"} placeholder="••••••••"
                   value={pwd} onChange={e=>{ setPwd(e.target.value); setError(""); }}
                   onKeyDown={e=>e.key==="Enter"&&handleLogin()} />
-                <button onClick={()=>setShow(!showPwd)}
-                  style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)",
-                    background:"none", border:"none", cursor:"pointer", color:C.muted }}>
+                <button onClick={()=>setShow(!showPwd)} style={{ position:"absolute", right:11, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:"1rem" }}>
                   {showPwd?"🙈":"👁"}
                 </button>
               </div>
             </div>
-            <button style={{ ...css.btnPrimary, width:"100%", padding:"11px",
-              opacity:loading?0.7:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
-              onClick={handleLogin} disabled={loading}>
-              {loading?"Connexion en cours...":"Se connecter →"}
+
+            <button onClick={handleLogin} disabled={loading} style={{
+              width:"100%", padding:"13px", borderRadius:12, border:"none",
+              background:loading?"#94a3b8":`linear-gradient(135deg,${C.blue},${C.aqua})`,
+              color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.92rem",
+              cursor:loading?"not-allowed":"pointer",
+              boxShadow:loading?"none":"0 4px 16px rgba(37,99,235,0.35)",
+              transition:"all 0.2s",
+            }}>
+              {loading?"Connexion...":"Se connecter →"}
             </button>
           </div>
         )}
 
         {/* ── CRÉER UN COMPTE ── */}
-        {vue === "register" && !regOk && (
-          <div style={{ background:"#fff", borderRadius:20, padding:"24px 20px",
-            boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
+        {vue==="register" && !regOk && (
+          <div style={{ background:"#fff", borderRadius:22, padding:"22px 18px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)" }}>
 
-            {/* Étape 1 — Choix du rôle */}
-            {regStep === 1 && <>
-              <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"1.05rem",
-                color:C.navy, marginBottom:3 }}>Créer mon compte</div>
-              <div style={{ color:C.muted, fontSize:"0.82rem", marginBottom:18 }}>
-                Sélectionne ton profil
-              </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
-                {ROLES.map(r => (
-                  <button key={r.id} onClick={()=>{ setRegRole(r.id); setRegStep(2); setError(""); }}
-                    style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 14px",
-                      borderRadius:12, border:`1px solid ${r.color}22`,
-                      background:r.bg, cursor:"pointer", fontFamily:"inherit", textAlign:"left" }}>
-                    <div style={{ width:40, height:40, borderRadius:10, background:"#fff",
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      fontSize:"1.2rem", flexShrink:0 }}>{r.icon}</div>
-                    <div>
-                      <div style={{ fontWeight:700, fontSize:"0.9rem", color:C.navy }}>{r.label}</div>
-                      <div style={{ fontSize:"0.76rem", color:C.mid }}>{r.desc}</div>
-                    </div>
-                    <span style={{ marginLeft:"auto", color:r.color, fontSize:"1.1rem" }}>›</span>
-                  </button>
-                ))}
-              </div>
-            </>}
+            {/* Étape 1 — Rôle */}
+            {regStep===1 && (
+              <>
+                <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", color:C.navy, marginBottom:4 }}>Créer mon compte</div>
+                <div style={{ color:C.muted, fontSize:"0.8rem", marginBottom:18 }}>Sélectionne ton profil</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {ROLES.map(r=>(
+                    <button key={r.id} onClick={()=>{ setRegRole(r.id); setRegStep(2); setError(""); }} style={{
+                      display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
+                      borderRadius:14, border:`1.5px solid ${r.color}25`, background:r.bg,
+                      cursor:"pointer", fontFamily:"inherit", textAlign:"left",
+                      transition:"all 0.15s",
+                    }}>
+                      <div style={{ width:38, height:38, borderRadius:10, background:"rgba(255,255,255,0.8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.15rem", flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,0.08)" }}>
+                        {r.icon}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:700, fontSize:"0.88rem", color:C.navy }}>{r.label}</div>
+                        <div style={{ fontSize:"0.72rem", color:C.mid, marginTop:1 }}>{r.desc}</div>
+                      </div>
+                      <span style={{ color:r.color, fontSize:"1.2rem", fontWeight:700 }}>›</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Étape 2 — Formulaire */}
-            {regStep === 2 && <>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
-                <button onClick={()=>{ setRegStep(1); setError(""); }}
-                  style={{ ...css.btnGhost, padding:"4px 8px", color:C.blue }}>← Retour</button>
-                <div style={{ fontWeight:700, color:C.navy }}>
-                  {roleInfo.icon} Compte {roleInfo.label}
+            {regStep===2 && (
+              <>
+                {/* Header */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16, paddingBottom:14, borderBottom:`1px solid ${C.border}` }}>
+                  <button onClick={()=>{ setRegStep(1); setError(""); }} style={{
+                    width:30, height:30, borderRadius:8, border:`1px solid ${C.border}`,
+                    background:C.surfaceAlt, cursor:"pointer", fontFamily:"inherit",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.9rem", flexShrink:0,
+                  }}>←</button>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ width:32, height:32, borderRadius:8, background:roleInfo.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem" }}>
+                      {roleInfo.icon}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:"0.9rem", color:C.navy }}>{roleInfo.label}</div>
+                      <div style={{ fontSize:"0.7rem", color:C.muted }}>Étape 2 sur 2</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {error && <div style={{ background:C.redLight, border:`1px solid ${C.redBorder}`,
-                borderRadius:9, padding:"9px 13px", marginBottom:12, fontSize:"0.82rem", color:C.red }}>
-                {error}
-              </div>}
+                {error && (
+                  <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:"9px 12px", marginBottom:12, fontSize:"0.8rem", color:"#dc2626" }}>
+                    ⚠️ {error}
+                  </div>
+                )}
 
-              <div style={{ background:"#fef9c3", border:"1px solid #fde68a", borderRadius:9,
-                padding:"10px 12px", marginBottom:14, fontSize:"0.81rem", color:"#78350f" }}>
-                Votre compte sera activé après validation par l'<strong>Admin Plateforme</strong> (24-48h).
-              </div>
-
-              {/* Nom & Prénom */}
-              <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                <div style={{ flex:1 }}>
-                  <span style={css.label}>Prénom</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Edmond"
-                    value={form.prenom} onChange={e=>setForm({...form,prenom:e.target.value})} />
+                {/* Bannière validation */}
+                <div style={{ background:"linear-gradient(135deg,#fefce8,#fef9c3)", border:"1px solid #fde68a", borderRadius:10, padding:"9px 12px", marginBottom:16, display:"flex", alignItems:"flex-start", gap:8 }}>
+                  <span style={{ fontSize:"1rem", flexShrink:0 }}>⏳</span>
+                  <div style={{ fontSize:"0.77rem", color:"#78350f", lineHeight:1.5 }}>
+                    Activation sous <strong>24-48h</strong> après validation par l'Admin Plateforme.
+                  </div>
                 </div>
-                <div style={{ flex:1 }}>
-                  <span style={css.label}>Nom</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="DADIE"
-                    value={form.nom} onChange={e=>setForm({...form,nom:e.target.value})} />
+
+                {/* Identité */}
+                <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                  <div style={{ flex:1 }}>
+                    <span style={css.label}>Prénom *</span>
+                    <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Edmond"
+                      value={prenom} onChange={e=>setPrenom(e.target.value)} />
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <span style={css.label}>Nom *</span>
+                    <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="DADIE"
+                      value={nom} onChange={e=>setNom(e.target.value)} />
+                  </div>
                 </div>
-              </div>
 
-              {/* Email */}
-              <div style={{ marginBottom:12 }}>
-                <span style={css.label}>Email</span>
-                <input style={{ ...css.input, background:C.surfaceAlt }} type="email"
-                  placeholder="prenom@arstm.ci" value={form.email}
-                  onChange={e=>setForm({...form,email:e.target.value})} />
-              </div>
+                <div style={{ marginBottom:10 }}>
+                  <span style={css.label}>Email *</span>
+                  <input style={{ ...css.input, background:C.surfaceAlt }} type="email" placeholder="prenom@arstm.ci"
+                    value={emailR} onChange={e=>setEmailR(e.target.value)} />
+                </div>
 
-              {/* ÉTUDIANT — Filière + Promo */}
-              {regRole==="etudiant" && (
+                {/* Champs spécifiques au rôle */}
+                <RoleSection />
+
+                {/* Séparateur contact */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, margin:"14px 0 12px" }}>
+                  <div style={{ flex:1, height:1, background:C.border }} />
+                  <span style={{ fontSize:"0.72rem", color:C.muted, fontWeight:600, whiteSpace:"nowrap" }}>Coordonnées</span>
+                  <div style={{ flex:1, height:1, background:C.border }} />
+                </div>
+
+                {/* Téléphone */}
+                <PhoneInput label="Téléphone *"
+                  tel={telNum} setTel={setTelNum}
+                  code={telCode} setCode={c=>{ setTelCode(c); if(waSame)setWaCode(c); }} />
+
+                {/* WhatsApp */}
                 <div style={{ marginBottom:12 }}>
-                  <span style={css.label}>Filière / Option</span>
-                  <select style={{ ...css.input, background:C.surfaceAlt, marginBottom:8 }}
-                    value={form.filiere} onChange={e=>setForm({...form,filiere:e.target.value})}>
-                    <option value="">Choisir une filière...</option>
-                    <optgroup label="Licence Pro Transport Maritime et Logistique (LPTML)">
-                      <option value="LPTML - Port Manutention">LPTML — Port Manutention</option>
-                      <option value="LPTML - Transit et Consignation">LPTML — Transit et Consignation</option>
-                      <option value="LPTML - Armement">LPTML — Armement</option>
-                      <option value="LPTML - Transport Multimodal">LPTML — Transport Multimodal</option>
-                    </optgroup>
-                    <optgroup label="Master Pro Transport Maritime et Logistique (MPTML)">
-                      <option value="MPTML - Gestion Maritime et Portuaire">MPTML — Gestion Maritime et Portuaire</option>
-                      <option value="MPTML - Logistique et Transport">MPTML — Logistique et Transport</option>
-                    </optgroup>
-                    <optgroup label="Sciences Nautiques">
-                      <option value="LPSN">Licence Pro Sciences Nautiques (LPSN)</option>
-                      <option value="MPSN">Master Pro Sciences Nautiques (MPSN)</option>
-                    </optgroup>
-                    <optgroup label="Mecanique Navale">
-                      <option value="LPMN">Licence Pro Mecanique Navale (LPMN)</option>
-                      <option value="MPMN">Master Pro Mecanique Navale (MPMN)</option>
-                    </optgroup>
-                    <optgroup label="Autres formations">
-                      <option value="CEAM">CEAM — Certificats Maritimes</option>
-                      <option value="FOAD">Formation a Distance (FOAD)</option>
-                      <option value="FC">Formation Continue et Professionnelle</option>
-                    </optgroup>
-                  </select>
-                  <span style={css.label}>Promotion</span>
-                  <select style={{ ...css.input, background:C.surfaceAlt }}
-                    value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})}>
-                    <option value="">Choisir une promotion...</option>
-                    {Array.from({length:40},(_,i)=>i+1).map(n=>(
-                      <option key={n} value={`Promo ${n}`}>Promotion {n}</option>
-                    ))}
-                  </select>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={css.label}>WhatsApp</span>
+                    <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer" }}>
+                      <div onClick={()=>setWaSame(!waSame)} style={{
+                        width:36, height:20, borderRadius:10, background:waSame?C.green:"#e2e8f0",
+                        position:"relative", transition:"background 0.2s", cursor:"pointer", flexShrink:0,
+                      }}>
+                        <span style={{ position:"absolute", top:2, left:waSame?18:2, width:16, height:16, borderRadius:"50%", background:"#fff", boxShadow:"0 1px 3px rgba(0,0,0,0.2)", transition:"left 0.2s" }} />
+                      </div>
+                      <span style={{ fontSize:"0.74rem", color:C.mid }}>= Tél</span>
+                    </label>
+                  </div>
+                  {waSame ? (
+                    <div style={{ ...css.input, background:"#f0fdf4", color:C.green, fontSize:"0.83rem", display:"flex", alignItems:"center", gap:7, border:"1px solid #bbf7d0" }}>
+                      💚 <span>{telCode} {telNum||"Même numéro"}</span>
+                    </div>
+                  ) : (
+                    <PhoneInput label="" tel={waNum} setTel={setWaNum} code={waCode} setCode={setWaCode} />
+                  )}
                 </div>
-              )}
 
-              {/* ENSEIGNANT */}
-              {regRole==="enseignant" && (
-                <div style={{ marginBottom:12 }}>
-                  <span style={css.label}>Module(s) enseigné(s)</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }}
-                    placeholder="Ex: Droit Maritime, Supply Chain..."
-                    value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})} />
+                {/* Séparateur sécurité */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, margin:"14px 0 12px" }}>
+                  <div style={{ flex:1, height:1, background:C.border }} />
+                  <span style={{ fontSize:"0.72rem", color:C.muted, fontWeight:600, whiteSpace:"nowrap" }}>Sécurité</span>
+                  <div style={{ flex:1, height:1, background:C.border }} />
                 </div>
-              )}
 
-              {/* ALUMNI */}
-              {regRole==="alumni" && (
-                <div style={{ marginBottom:12 }}>
-                  <span style={css.label}>Filière de sortie</span>
-                  <select style={{ ...css.input, background:C.surfaceAlt, marginBottom:8 }}
-                    value={form.filiere} onChange={e=>setForm({...form,filiere:e.target.value})}>
-                    <option value="">Choisir une filière...</option>
-                    <option value="LPTML">LPTML</option>
-                    <option value="MPTML">MPTML</option>
-                    <option value="LPSN">LPSN</option>
-                    <option value="MPSN">MPSN</option>
-                    <option value="LPMN">LPMN</option>
-                    <option value="MPMN">MPMN</option>
-                    <option value="CEAM">CEAM</option>
-                  </select>
-                  <span style={css.label}>Promotion de sortie</span>
-                  <select style={{ ...css.input, background:C.surfaceAlt }}
-                    value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})}>
-                    <option value="">Sélectionner...</option>
-                    {Array.from({length:40},(_,i)=>i+1).map(n=>(
-                      <option key={n} value={`Promo ${n}`}>Promotion {n}</option>
-                    ))}
-                  </select>
+                <div style={{ display:"flex", gap:8, marginBottom:18 }}>
+                  <div style={{ flex:1 }}>
+                    <span style={css.label}>Mot de passe *</span>
+                    <input style={{ ...css.input, background:C.surfaceAlt }} type="password" placeholder="Min. 6 car."
+                      value={password} onChange={e=>setPassword(e.target.value)} />
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <span style={css.label}>Confirmer *</span>
+                    <input style={{ ...css.input, background:C.surfaceAlt }} type="password" placeholder="Répéter"
+                      value={confirm} onChange={e=>setConfirm(e.target.value)} />
+                  </div>
                 </div>
-              )}
 
-              {/* ADMINISTRATION */}
-              {regRole==="administration" && (
-                <div style={{ marginBottom:12 }}>
-                  <span style={css.label}>Service / Direction</span>
-                  <select style={{ ...css.input, background:C.surfaceAlt }}
-                    value={form.promo} onChange={e=>setForm({...form,promo:e.target.value})}>
-                    <option value="">Sélectionner...</option>
-                    <option>Direction Generale</option>
-                    <option>Direction Academique</option>
-                    <option>Scolarite</option>
-                    <option>Comptabilite et Finances</option>
-                    <option>Communication et Marketing</option>
-                    <option>Relations Exterieures</option>
-                    <option>Ressources Humaines</option>
-                    <option>ESTM</option>
-                    <option>ESN</option>
-                    <option>CEAM</option>
-                    <option>ISMI</option>
-                    <option>CREMPOL</option>
-                    <option>FOAD</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Mot de passe */}
-              <div style={{ display:"flex", gap:10, marginBottom:16 }}>
-                <div style={{ flex:1 }}>
-                  <span style={css.label}>Mot de passe</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }} type="password"
-                    placeholder="Min. 6 caractères"
-                    value={form.password} onChange={e=>setForm({...form,password:e.target.value})} />
-                </div>
-                <div style={{ flex:1 }}>
-                  <span style={css.label}>Confirmer</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }} type="password"
-                    placeholder="Répéter"
-                    value={form.confirm} onChange={e=>setForm({...form,confirm:e.target.value})} />
-                </div>
-              </div>
-
-              <button style={{ ...css.btnPrimary, width:"100%", padding:"11px",
-                background:`linear-gradient(135deg,${roleInfo.color||C.blue},${C.blue})`,
-                opacity:loading?0.7:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
-                onClick={handleRegister} disabled={loading}>
-                {loading?"Creation en cours...":"Créer mon compte →"}
-              </button>
-            </>}
+                <button onClick={handleRegister} disabled={loading} style={{
+                  width:"100%", padding:"13px", borderRadius:12, border:"none",
+                  background:loading?"#94a3b8":`linear-gradient(135deg,${roleInfo.color||C.blue},${C.blue})`,
+                  color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.9rem",
+                  cursor:loading?"not-allowed":"pointer",
+                  boxShadow:loading?"none":`0 4px 16px ${roleInfo.color||C.blue}40`,
+                  transition:"all 0.2s",
+                }}>
+                  {loading?"Création...":"Créer mon compte →"}
+                </button>
+              </>
+            )}
           </div>
         )}
 
         {/* ── SUCCÈS ── */}
-        {vue === "register" && regOk && (
-          <div style={{ background:"#fff", borderRadius:20, padding:"32px 22px",
-            boxShadow:"0 24px 60px rgba(0,0,0,0.3)", textAlign:"center" }}>
-            <div style={{ fontSize:"2.5rem", marginBottom:12 }}>🎉</div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem",
-              color:C.navy, marginBottom:8 }}>Compte créé !</div>
-            <div style={{ background:"#fef9c3", border:"1px solid #fde68a", borderRadius:10,
-              padding:"12px", marginBottom:14, textAlign:"left" }}>
-              <div style={{ fontWeight:700, color:"#92400e", fontSize:"0.83rem", marginBottom:3 }}>
-                Validation requise
+        {vue==="register" && regOk && (
+          <div style={{ background:"#fff", borderRadius:22, padding:"32px 22px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", textAlign:"center" }}>
+            <div style={{ width:64, height:64, borderRadius:"50%", background:"#f0fdf4", border:"2px solid #bbf7d0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"2rem", margin:"0 auto 16px" }}>🎉</div>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.15rem", color:C.navy, marginBottom:6 }}>Compte créé !</div>
+            <div style={{ fontSize:"0.82rem", color:C.muted, lineHeight:1.6, marginBottom:18 }}>
+              Votre demande est en cours de traitement.
+            </div>
+            <div style={{ background:"#fefce8", border:"1px solid #fde68a", borderRadius:12, padding:"12px 14px", marginBottom:20, textAlign:"left" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                <span>⏳</span>
+                <span style={{ fontWeight:700, color:"#92400e", fontSize:"0.82rem" }}>Validation requise</span>
               </div>
-              <div style={{ fontSize:"0.81rem", color:"#78350f", lineHeight:1.6 }}>
-                Votre compte est en attente de validation par l'<strong>Admin Plateforme</strong>.
-                Vous serez notifié sous 24-48h ouvrables.
+              <div style={{ fontSize:"0.78rem", color:"#78350f", lineHeight:1.6 }}>
+                L'<strong>Admin Plateforme</strong> activera votre compte sous 24-48h ouvrables.
               </div>
             </div>
-            <button style={{ ...css.btnPrimary, width:"100%" }} onClick={resetForm}>
+            <button onClick={reset} style={{
+              width:"100%", padding:"12px", borderRadius:12, border:"none",
+              background:`linear-gradient(135deg,${C.blue},${C.aqua})`,
+              color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.9rem",
+              cursor:"pointer", boxShadow:"0 4px 16px rgba(37,99,235,0.3)",
+            }}>
               Aller à la connexion →
             </button>
           </div>
         )}
 
-        <div style={{ textAlign:"center", marginTop:16, fontSize:"0.72rem",
-          color:"rgba(255,255,255,0.25)" }}>
-          ARSTM Campus v2.0 · Firebase · Mai 2026
+        <div style={{ textAlign:"center", marginTop:18, fontSize:"0.7rem", color:"rgba(255,255,255,0.2)" }}>
+          ARSTM Campus v2.0 · Firebase · 2026
         </div>
       </div>
     </div>

@@ -120,7 +120,7 @@ function FeedPost({ p, uid, onReact }) {
   );
 }
 
-export default function Accueil({ setPage, isMobile, profile }) {
+export default function Accueil({ setPage, isMobile, profile, onGoToReseau }) {
   const { user } = useAuth();
   const role     = profile?.role || "etudiant";
   const roleInfo = getRoleInfo(role);
@@ -345,7 +345,7 @@ export default function Accueil({ setPage, isMobile, profile }) {
           : suggestions.map(u => {
             const ri = getRoleInfo(u.role);
             return (
-              <div key={u.uid} onClick={() => setPage("social")} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
+              <div key={u.uid} onClick={() => onGoToReseau ? onGoToReseau() : setPage("social")} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
                 <div style={{ width:34, height:34, borderRadius:"50%", background:u.photoURL?"transparent":ri.bg, color:ri.color,
                   display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:"0.72rem", overflow:"hidden", flexShrink:0 }}>
                   {u.photoURL ? <img src={u.photoURL} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (u.avatar||u.name?.slice(0,2))}
@@ -357,7 +357,7 @@ export default function Accueil({ setPage, isMobile, profile }) {
               </div>
             );
           })}
-        <button style={{ ...css.btnSecondary, width:"100%", marginTop:12, fontSize:"0.82rem" }} onClick={() => setPage("social")}>Voir le réseau →</button>
+        <button style={{ ...css.btnSecondary, width:"100%", marginTop:12, fontSize:"0.82rem" }} onClick={() => onGoToReseau ? onGoToReseau() : setPage("social")}>Voir le réseau →</button>
       </div>
 
       {role==="etudiant" && offres.length > 0 && (
@@ -377,7 +377,6 @@ export default function Accueil({ setPage, isMobile, profile }) {
 
   return (
     <div>
-      {Banner}
       {isMobile ? (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           {CenterCol}

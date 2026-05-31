@@ -69,6 +69,28 @@ function useMsgs(cid) {
   return msgs;
 }
 
+// Live presence (online / lastSeen) for a single user
+function usePresence(uid) {
+  const [pres, setPres] = useState(null);
+  useEffect(() => {
+    if (!uid) { setPres(null); return; }
+    return onSnapshot(doc(db, "users", uid), s => {
+      if (s.exists()) { const d = s.data(); setPres({ online: d.online, lastSeen: d.lastSeen }); }
+    });
+  }, [uid]);
+  return pres;
+}
+
+// Live conversation doc (for read receipts via lastRead map)
+function useConvDoc(cid) {
+  const [conv, setConv] = useState(null);
+  useEffect(() => {
+    if (!cid) { setConv(null); return; }
+    return onSnapshot(doc(db, "conversations", cid), s => setConv(s.exists() ? s.data() : null));
+  }, [cid]);
+  return conv;
+}
+
 function useUsers(uid) {
   const [users, setUsers] = useState([]);
   useEffect(() => {
@@ -109,7 +131,7 @@ const Avatar = memo(({ user, size = 44, showOnline = false }) => {
 });
 
 // ── Bulle de message ──
-const Bubble = memo(({ msg, isMine, profile, onReply, onReact, showAvatar, senderUser }) => {
+const Bubble = memo(({ msg, isMine, profile, onReply, onReact, showAvatar, senderUser, read }) => {
   const [showActions, setShowActions] = useState(false);
   const REACTIONS = ["❤️", "😂", "👍", "🙏", "🔥", "😮"];
 
@@ -182,7 +204,8 @@ const Bubble = memo(({ msg, isMine, profile, onReply, onReact, showAvatar, sende
               textAlign: "right", opacity: 0.65,
               color: isMine ? "#fff" : C.muted,
             }}>
-              {fmt(msg.createdAt)}{isMine && " ✓✓"}
+              {fmt(msg.createdAt)}
+              {isMine && <span style={{ color: read ? "#38bdf8" : "rgba(255,255,255,0.65)", fontWeight: 700, marginLeft: 3 }}>✓✓</span>}
             </div>
           )}
         </div>
@@ -285,6 +308,37 @@ export default function PageMessages({ profile, onClose, floating = false }) {
   const convs    = useConvs(profile?.uid);
   const messages = useMsgs(convId_);
   const allUsers = useUsers(profile?.uid);
+  const presence = usePresence(otherUser?.uid);
+  const convDoc  = useConvDoc(convId_);
+
+  // Read receipt for my messages: other party's lastRead >= message time
+  const otherLastRead = otherUser?.uid ? convDoc?.lastRead?.[otherUser.uid] : null;
+  const isReadByOther = (msg) => {
+    if (!otherLastRead?.toMillis || !msg.createdAt?.toMillis) return false;
+    return otherLastRead.toMillis() >= msg.createdAt.toMillis();
+  };
+
+  // Presence label
+  const presenceLabel = () => {
+    if (presence?.online) return "En ligne";
+    const ls = presence?.lastSeen?.toDate?.();
+    if (!ls) return getRoleInfo(otherUser?.role).label;
+    const diff = Date.now() - ls.getTime();
+    if (diff < 60000) return "Vu à l'instant";
+    if (diff < 3600000) return `Vu il y a ${Math.floor(diff/60000)} min`;
+    if (diff < 86400000) return `Vu à ${ls.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}`;
+    return `Vu le ${ls.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})}`;
+  };
+
+  // Mark conversation as read when viewing chat / new messages arrive
+  useEffect(() => {
+    if (screen === "chat" && convId_ && profile?.uid) {
+      updateDoc(doc(db, "conversations", convId_), {
+        [`lastRead.${profile.uid}`]: serverTimestamp(),
+        [`unread.${profile.uid}`]: 0,
+      }).catch(() => {});
+    }
+  }, [screen, convId_, messages.length, profile?.uid]);
 
   const filtered = allUsers.filter(u => {
     if (!search) return true;
@@ -538,12 +592,12 @@ export default function PageMessages({ profile, onClose, floating = false }) {
       {/* Header conversation */}
       <div style={{ padding: "10px 14px", background: `linear-gradient(135deg,${C.navy},#1e3a5f)`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
         <button onClick={() => { setScreen("list"); setConvId(null); setOtherUser(null); setShowEmoji(false); setReplyTo(null); }} style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.12)", border: "none", color: "#fff", cursor: "pointer", fontSize: "1rem", flexShrink: 0 }}>←</button>
-        {otherUser && <Avatar user={otherUser} size={38} showOnline />}
+        {otherUser && <Avatar user={{...otherUser, online: presence?.online}} size={38} showOnline={!!presence?.online} />}
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#fff" }}>{otherUser?.name}</div>
           <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.6)", display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: CH.online, display: "inline-block" }} />
-            {getRoleInfo(otherUser?.role).icon} {getRoleInfo(otherUser?.role).label}
+            {presence?.online && <span style={{ width: 6, height: 6, borderRadius: "50%", background: CH.online, display: "inline-block" }} />}
+            {presenceLabel()}
           </div>
         </div>
         {onClose && <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>}
@@ -589,6 +643,7 @@ export default function PageMessages({ profile, onClose, floating = false }) {
                 onReply={setReplyTo} onReact={react}
                 showAvatar={showAvatar}
                 senderUser={!isMine ? otherUser : null}
+                read={isMine && isReadByOther(m)}
               />
             </div>
           );

@@ -101,10 +101,12 @@ function CommentsSection({ postId, postAuthorUid, profile }) {
 }
 
 // ── Carte de post ─────────────────────────────────────────────────────────────
-function PostCard({ p, uid, profile, onReact, onOpenProfil }) {
+function PostCard({ p, uid, profile, onReact, onOpenProfil, onShare }) {
   const [showReactions, setShowReactions] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [shared, setShared] = useState(false);
+  const shareCount = p.shareCount || 0;
   const r = getRoleInfo(p.role);
   const reactions = p.reactions || {};
   const total = Object.values(reactions).reduce((s, a) => s + a.length, 0);
@@ -158,6 +160,25 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil }) {
         </div>
       )}
 
+      {/* Post repartagé */}
+      {p.sharedFrom && (
+        <div style={{ border:`1px solid ${C.border}`, borderRadius:12, padding:"10px 12px", marginBottom:10, background:C.surfaceAlt }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+            <span style={{ fontSize:"0.72rem" }}>🔁</span>
+            <span style={{ fontWeight:700, fontSize:"0.82rem", color:C.navy }}>{p.sharedFrom.auteur}</span>
+            {p.sharedFrom.role && <span style={{ ...css.badge(getRoleInfo(p.sharedFrom.role).bg, getRoleInfo(p.sharedFrom.role).color), fontSize:"0.64rem" }}>{getRoleInfo(p.sharedFrom.role).icon}</span>}
+          </div>
+          {p.sharedFrom.texte && <p style={{ fontSize:"0.83rem", lineHeight:1.6, color:C.dark, margin:0 }}>{p.sharedFrom.texte}</p>}
+          {p.sharedFrom.mediaUrl && (
+            <div style={{ marginTop:8, borderRadius:8, overflow:"hidden", maxHeight:240 }}>
+              {p.sharedFrom.mediaType === "video"
+                ? <video controls src={p.sharedFrom.mediaUrl} style={{ width:"100%", maxHeight:240, background:"#000", display:"block" }}/>
+                : <img src={p.sharedFrom.mediaUrl} alt="" style={{ width:"100%", maxHeight:240, objectFit:"cover", display:"block" }}/>}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Compteurs réactions */}
       {total > 0 && (
         <div style={{ display:"flex", gap:4, marginBottom:8, flexWrap:"wrap" }}>
@@ -194,6 +215,10 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil }) {
         <button onClick={() => setShowComments(!showComments)}
           style={{ background:"none", border:"none", cursor:"pointer", color:showComments?C.blue:C.muted, fontSize:"0.84rem", padding:0, fontFamily:"inherit", display:"flex", alignItems:"center", gap:4 }}>
           💬 {commentCount > 0 ? commentCount : "Commenter"}
+        </button>
+        <button onClick={async () => { await onShare(p); setShared(true); setTimeout(() => setShared(false), 2500); }}
+          style={{ background:"none", border:"none", cursor:"pointer", color:shared?C.green:C.muted, fontSize:"0.84rem", padding:0, fontFamily:"inherit", display:"flex", alignItems:"center", gap:4 }}>
+          {shared ? "✓ Partagé" : `🔁 ${shareCount > 0 ? shareCount : "Partager"}`}
         </button>
         <button onClick={() => onOpenProfil(p.auteurUid, p)}
           style={{ background:"none", border:"none", cursor:"pointer", color:C.blue, fontSize:"0.82rem", padding:0, fontFamily:"inherit", marginLeft:"auto" }}>
@@ -364,6 +389,48 @@ export default function PageSocial({ profile, setPage }) {
     else if (fallback) setViewUser({ name:fallback.auteur||fallback.name, avatar:fallback.avatar, role:fallback.role, promo:fallback.promo, photoURL:fallback.photoURL });
   };
 
+  const share = async (post) => {
+    const uid = user?.uid; if (!uid) return;
+    // Source = post original (ou la source si on repartage un repartage)
+    const origin = post.sharedFrom || {
+      originalId: post.id,
+      auteur:    post.auteur,
+      auteurUid: post.auteurUid,
+      avatar:    post.avatar,
+      role:      post.role,
+      promo:     post.promo,
+      photoURL:  post.photoURL || null,
+      texte:     post.texte || "",
+      ...(post.mediaUrl ? { mediaUrl:post.mediaUrl, mediaType:post.mediaType } : {}),
+    };
+    await addDocument("posts", {
+      auteur:    profile.name,
+      auteurUid: uid,
+      avatar:    profile.avatar || profile.name?.slice(0,2),
+      photoURL:  profile.photoURL || null,
+      role:      profile.role,
+      promo:     profile.promo,
+      texte:     "",
+      sharedFrom: origin,
+      likes:     [],
+      reactions: {},
+      commentCount: 0,
+      comments:  [],
+    });
+    // Incrémente le compteur de partages sur l'original
+    await updateDocument("posts", post.sharedFrom?.originalId || post.id, { shareCount: (post.shareCount || 0) + 1 });
+    // Notifie l'auteur original
+    if (origin.auteurUid && origin.auteurUid !== uid) {
+      await sendNotif(origin.auteurUid, {
+        type:      "share",
+        fromName:  profile.name,
+        fromAvatar:profile.avatar || profile.name?.slice(0,2),
+        postId:    origin.originalId,
+        postText:  (origin.texte||"").slice(0,80),
+      });
+    }
+  };
+
   const r = getRoleInfo(profile.role);
 
   // Réseau
@@ -412,7 +479,7 @@ export default function PageSocial({ profile, setPage }) {
         <>
           <PostComposer profile={profile} r={r} onPublish={publish}/>
           {posts.map(p => (
-            <PostCard key={p.id} p={p} uid={user?.uid} profile={profile} onReact={react} onOpenProfil={openProfil}/>
+            <PostCard key={p.id} p={p} uid={user?.uid} profile={profile} onReact={react} onOpenProfil={openProfil} onShare={share}/>
           ))}
           {posts.length===0 && (
             <div style={{ ...css.card, textAlign:"center", padding:48, color:C.muted }}>

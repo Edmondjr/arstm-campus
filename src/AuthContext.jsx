@@ -3,7 +3,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { GRADIENTS } from "./design";
 
@@ -47,6 +47,31 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ── Presence tracking ──
+  useEffect(() => {
+    if (!user?.uid) return;
+    const uid = user.uid;
+    updateDoc(doc(db, "users", uid), {
+      online: true, lastSeen: serverTimestamp(),
+    }).catch(() => {});
+
+    const setOffline = () =>
+      updateDoc(doc(db, "users", uid), { online: false, lastSeen: serverTimestamp() }).catch(() => {});
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") setOffline();
+      else updateDoc(doc(db, "users", uid), { online: true, lastSeen: serverTimestamp() }).catch(() => {});
+    };
+
+    window.addEventListener("beforeunload", setOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      setOffline();
+      window.removeEventListener("beforeunload", setOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [user?.uid]);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -61,6 +86,13 @@ export function AuthProvider({ children }) {
     });
     return unsub;
   }, []);
+
+  async function reloadProfile(uid) {
+    const id = uid || user?.uid;
+    if (!id) return;
+    const snap = await getDoc(doc(db, "users", id));
+    if (snap.exists()) setProfile(snap.data());
+  }
 
   async function register({
     email, password, nom, prenom, role,
@@ -86,6 +118,7 @@ export function AuthProvider({ children }) {
       poste:      poste      || "",
       service:    service    || "",
       status:     "pending",
+      online:     false,
       createdAt:  serverTimestamp(),
       avatar:     `${prenom[0]}${nom[0]}`.toUpperCase(),
     };
@@ -107,13 +140,18 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    if (user?.uid) {
+      await updateDoc(doc(db, "users", user.uid), {
+        online: false, lastSeen: serverTimestamp(),
+      }).catch(() => {});
+    }
     await signOut(auth);
     setUser(null);
     setProfile(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, register, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, register, login, logout, reloadProfile }}>
       {loading ? <LoadingScreen /> : children}
     </AuthContext.Provider>
   );

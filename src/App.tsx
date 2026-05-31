@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
 import { C, ROLES, SHADOWS, GRADIENTS, css } from "./design";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "./firebase";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
 import PageEDT from "./pages/EDT";
@@ -67,6 +69,7 @@ export default function App() {
   const [activeMode, setActiveMode]   = useState(null);
   const [showMessages, setShowMessages] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const goTo = (id) => {
     setPageState(id);
@@ -79,6 +82,13 @@ export default function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    if (profile?.role !== "superadmin" && profile?.role !== "administration" && profile?.role !== "control") return;
+    const q = query(collection(db, "users"), where("status", "==", "pending"));
+    const unsub = onSnapshot(q, snap => setPendingCount(snap.size), () => {});
+    return unsub;
+  }, [profile?.role]);
 
   if (!user || !profile) return <Login />;
 
@@ -189,8 +199,13 @@ export default function App() {
           </div>
           <div style={css.tabs}>
             {navDesktop.map(([id, label]) => (
-              <button key={id+label} style={{...css.tab(page===id), fontFamily:"inherit"}} onClick={() => goTo(id)}>
+              <button key={id+label} style={{...css.tab(page===id), fontFamily:"inherit", position:"relative"}} onClick={() => goTo(id)}>
                 {label}
+                {id==="admin" && pendingCount > 0 && (
+                  <span style={{ position:"absolute", top:2, right:2, minWidth:16, height:16, borderRadius:8, background:"#dc2626", color:"#fff", fontSize:"0.6rem", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -249,9 +264,16 @@ export default function App() {
                 flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
                 gap:2, border:"none", background:"transparent", cursor:"pointer", fontFamily:"inherit",
                 borderTop: active ? `2.5px solid ${C.blue}` : "2.5px solid transparent",
-                transition:"border-color 0.15s",
+                transition:"border-color 0.15s", position:"relative",
               }}>
-                <span style={{fontSize:"1.15rem",lineHeight:1,transition:"transform 0.15s",transform:active?"scale(1.1)":"scale(1)"}}>{icon}</span>
+                <span style={{fontSize:"1.15rem",lineHeight:1,transition:"transform 0.15s",transform:active?"scale(1.1)":"scale(1)", position:"relative"}}>
+                  {icon}
+                  {id==="admin" && pendingCount > 0 && (
+                    <span style={{ position:"absolute", top:-4, right:-6, minWidth:14, height:14, borderRadius:7, background:"#dc2626", color:"#fff", fontSize:"0.55rem", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>
+                      {pendingCount}
+                    </span>
+                  )}
+                </span>
                 <span style={{fontSize:"0.6rem",fontWeight:active?700:600,color:active?C.blue:C.muted,transition:"color 0.15s"}}>{label}</span>
               </button>
             );

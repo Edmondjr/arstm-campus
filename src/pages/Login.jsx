@@ -1,23 +1,21 @@
 import { useState, useCallback, memo, useMemo } from "react";
 import { useAuth } from "../AuthContext";
 import { C, ROLES, GRADIENTS, css } from "../design";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../firebase";
 
 const CODES = [
-  {code:"+225",flag:"🇨🇮",short:"CI"},{code:"+223",flag:"🇲🇱",short:"ML"},
-  {code:"+226",flag:"🇧🇫",short:"BF"},{code:"+228",flag:"🇹🇬",short:"TG"},
-  {code:"+229",flag:"🇧🇯",short:"BJ"},{code:"+224",flag:"🇬🇳",short:"GN"},
-  {code:"+221",flag:"🇸🇳",short:"SN"},{code:"+237",flag:"🇨🇲",short:"CM"},
-  {code:"+242",flag:"🇨🇬",short:"CG"},{code:"+243",flag:"🇨🇩",short:"CD"},
-  {code:"+241",flag:"🇬🇦",short:"GA"},{code:"+233",flag:"🇬🇭",short:"GH"},
-  {code:"+234",flag:"🇳🇬",short:"NG"},{code:"+212",flag:"🇲🇦",short:"MA"},
-  {code:"+33", flag:"🇫🇷",short:"FR"},{code:"+32", flag:"🇧🇪",short:"BE"},
-  {code:"+41", flag:"🇨🇭",short:"CH"},{code:"+1",  flag:"🇺🇸",short:"US"},
-  {code:"+44", flag:"🇬🇧",short:"GB"},
+  {code:"+225",flag:"🇨🇮"},{code:"+223",flag:"🇲🇱"},{code:"+226",flag:"🇧🇫"},
+  {code:"+228",flag:"🇹🇬"},{code:"+229",flag:"🇧🇯"},{code:"+224",flag:"🇬🇳"},
+  {code:"+221",flag:"🇸🇳"},{code:"+237",flag:"🇨🇲"},{code:"+242",flag:"🇨🇬"},
+  {code:"+243",flag:"🇨🇩"},{code:"+241",flag:"🇬🇦"},{code:"+233",flag:"🇬🇭"},
+  {code:"+234",flag:"🇳🇬"},{code:"+212",flag:"🇲🇦"},{code:"+33",flag:"🇫🇷"},
+  {code:"+32",flag:"🇧🇪"},{code:"+41",flag:"🇨🇭"},{code:"+1",flag:"🇺🇸"},
+  {code:"+44",flag:"🇬🇧"},
 ];
 
 const ECOLES = ["ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"];
 
-/* Password strength: 0–4 */
 function getPwdStrength(pwd) {
   if (!pwd) return 0;
   let s = 0;
@@ -35,7 +33,7 @@ const PhoneInput = memo(({ label, tel, setTel, code, setCode, style={} }) => (
     {label && <span style={css.label}>{label}</span>}
     <div style={{ display:"flex", gap:6 }}>
       <select value={code} onChange={e => setCode(e.target.value)}
-        style={{ ...css.input, background:C.surfaceAlt, width:80, flexShrink:0, padding:"8px 4px", fontSize:"0.85rem" }}>
+        style={{ ...css.input, background:C.surfaceAlt, width:82, flexShrink:0, padding:"8px 4px", fontSize:"0.85rem" }}>
         {CODES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
       </select>
       <input style={{ ...css.input, background:C.surfaceAlt, flex:1 }}
@@ -45,11 +43,85 @@ const PhoneInput = memo(({ label, tel, setTel, code, setCode, style={} }) => (
   </div>
 ));
 
+// ── Modal réinitialisation mot de passe ──
+function ResetModal({ onClose }) {
+  const [email, setEmail]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState("");
+
+  const handleReset = async () => {
+    setError("");
+    if (!email.trim()) { setError("Saisissez votre adresse email."); return; }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSent(true);
+    } catch (e) {
+      if (e.code === "auth/user-not-found" || e.code === "auth/invalid-email")
+        setError("Aucun compte trouvé avec cet email.");
+      else setError("Erreur. Réessayez plus tard.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e => e.stopPropagation()} className="modal-enter" style={{ background:"#fff", borderRadius:20, padding:"28px 22px", width:"100%", maxWidth:360, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
+        {sent ? (
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:12 }}>📧</div>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", color:C.navy, marginBottom:8 }}>Email envoyé !</div>
+            <p style={{ fontSize:"0.83rem", color:C.muted, lineHeight:1.6, marginBottom:20 }}>
+              Un lien de réinitialisation a été envoyé à <strong>{email}</strong>. Vérifiez votre boîte mail (et les spams).
+            </p>
+            <button onClick={onClose} style={{ ...css.btnPrimary, width:"100%", padding:"12px", borderRadius:12 }}>
+              Retour à la connexion
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", color:C.navy, marginBottom:6 }}>
+              🔐 Mot de passe oublié
+            </div>
+            <p style={{ fontSize:"0.82rem", color:C.muted, lineHeight:1.55, marginBottom:18 }}>
+              Saisissez votre email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+            </p>
+            {error && (
+              <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"9px 12px", marginBottom:14, fontSize:"0.81rem", color:"#dc2626" }}>
+                ⚠️ {error}
+              </div>
+            )}
+            <div style={{ marginBottom:16 }}>
+              <span style={css.label}>Votre adresse email</span>
+              <input style={{ ...css.input, background:C.surfaceAlt }}
+                type="email" placeholder="prenom@arstm.ci"
+                value={email} onChange={e => { setEmail(e.target.value); setError(""); }}
+                onKeyDown={e => e.key === "Enter" && handleReset()} autoFocus />
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={onClose} style={{ ...css.btnSecondary, flex:1, padding:"11px" }}>Annuler</button>
+              <button onClick={handleReset} disabled={loading} style={{
+                flex:1, padding:"11px", borderRadius:8, border:"none",
+                background: loading ? "#94a3b8" : GRADIENTS.primary,
+                color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.87rem", cursor: loading ? "not-allowed" : "pointer",
+              }}>
+                {loading ? "Envoi…" : "Envoyer →"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   const { login, register } = useAuth();
   const [vue, setVue]         = useState("login");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [showReset, setShowReset] = useState(false);
 
   // Connexion
   const [email, setEmail]   = useState("");
@@ -90,7 +162,7 @@ export default function Login() {
     setLoading(true);
     try { await login(email.trim(), pwd); }
     catch (e) {
-      if (e.message === "PENDING")   setError("Compte en attente de validation (24-48h).");
+      if (e.message === "PENDING")   setError("Compte en attente de validation (24-48h ouvrables).");
       else if (e.message === "REJECTED") setError("Compte refusé. Contactez le support.");
       else setError("Email ou mot de passe incorrect.");
       setLoading(false);
@@ -133,9 +205,7 @@ export default function Login() {
       background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10,
       padding:"10px 13px", marginBottom:14, fontSize:"0.82rem",
       color:"#dc2626", display:"flex", alignItems:"center", gap:8,
-    }}>
-      ⚠️ {error}
-    </div>
+    }}>⚠️ {error}</div>
   );
 
   const RoleSection = () => {
@@ -156,17 +226,13 @@ export default function Login() {
               <option value="MPTML - Logistique et Transport">Logistique et Transport</option>
             </optgroup>
             <optgroup label="Sciences Nautiques">
-              <option value="LPSN">Licence (LPSN)</option>
-              <option value="MPSN">Master (MPSN)</option>
+              <option value="LPSN">Licence (LPSN)</option><option value="MPSN">Master (MPSN)</option>
             </optgroup>
             <optgroup label="Mecanique Navale">
-              <option value="LPMN">Licence (LPMN)</option>
-              <option value="MPMN">Master (MPMN)</option>
+              <option value="LPMN">Licence (LPMN)</option><option value="MPMN">Master (MPMN)</option>
             </optgroup>
             <optgroup label="Autres">
-              <option value="CEAM">CEAM</option>
-              <option value="FOAD">FOAD</option>
-              <option value="FC">Formation Continue</option>
+              <option value="CEAM">CEAM</option><option value="FOAD">FOAD</option><option value="FC">Formation Continue</option>
             </optgroup>
           </select>
         </div>
@@ -179,13 +245,11 @@ export default function Login() {
         </div>
       </>
     );
-
     if (regRole === "enseignant") return (
       <>
         <div style={{ marginBottom:10 }}>
           <span style={css.label}>Module(s)</span>
-          <input style={{ ...css.input, background:C.surfaceAlt }}
-            placeholder="Ex: Droit Maritime, Supply Chain..."
+          <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Ex: Droit Maritime, Supply Chain..."
             value={modules} onChange={e => setModules(e.target.value)} />
         </div>
         <div style={{ marginBottom:10 }}>
@@ -200,13 +264,11 @@ export default function Login() {
               }}>{e}</button>
             ))}
           </div>
-          <input style={{ ...css.input, background:C.surfaceAlt }}
-            placeholder="Autre (préciser)..."
+          <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Autre (préciser)..."
             value={ecoleAutre} onChange={e => setEcoleAutre(e.target.value)} />
         </div>
       </>
     );
-
     if (regRole === "alumni") return (
       <>
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
@@ -226,28 +288,17 @@ export default function Login() {
           </div>
         </div>
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-          <div style={{ flex:1 }}>
-            <span style={css.label}>Employeur</span>
-            <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel"
-              value={employeur} onChange={e => setEmployeur(e.target.value)} />
-          </div>
-          <div style={{ flex:1 }}>
-            <span style={css.label}>Poste</span>
-            <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel"
-              value={poste} onChange={e => setPoste(e.target.value)} />
-          </div>
+          <div style={{ flex:1 }}><span style={css.label}>Employeur</span><input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel" value={employeur} onChange={e => setEmployeur(e.target.value)} /></div>
+          <div style={{ flex:1 }}><span style={css.label}>Poste</span><input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Optionnel" value={poste} onChange={e => setPoste(e.target.value)} /></div>
         </div>
       </>
     );
-
     if (regRole === "administration") return (
       <div style={{ marginBottom:10 }}>
         <span style={css.label}>Service / Direction</span>
         <select style={{ ...css.input, background:C.surfaceAlt }} value={service} onChange={e => setService(e.target.value)}>
           <option value="">Sélectionner...</option>
-          {["Direction Generale","Direction Academique","Scolarite","Comptabilite et Finances",
-            "Communication et Marketing","Relations Exterieures","Ressources Humaines",
-            "ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"].map(s=><option key={s}>{s}</option>)}
+          {["Direction Generale","Direction Academique","Scolarite","Comptabilite et Finances","Communication et Marketing","Relations Exterieures","Ressources Humaines","ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"].map(s=><option key={s}>{s}</option>)}
         </select>
       </div>
     );
@@ -255,39 +306,25 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      minHeight:"100vh",
-      background: GRADIENTS.login,
-      display:"flex", alignItems:"center", justifyContent:"center",
-      padding:16, overflowY:"auto",
-    }}>
+    <div style={{ minHeight:"100vh", background: GRADIENTS.login, display:"flex", alignItems:"center", justifyContent:"center", padding:16, overflowY:"auto" }}>
+      {showReset && <ResetModal onClose={() => setShowReset(false)} />}
+
       {/* Decorative orbs */}
-      <div style={{ position:"fixed", top:-100, right:-100, width:340, height:340, borderRadius:"50%", background:"rgba(37,99,235,0.07)", pointerEvents:"none", animation:"pulse 4s ease-in-out infinite" }} />
-      <div style={{ position:"fixed", bottom:-80, left:-80, width:240, height:240, borderRadius:"50%", background:"rgba(8,145,178,0.05)", pointerEvents:"none", animation:"pulse 5s ease-in-out infinite 1s" }} />
-      <div style={{ position:"fixed", top:"40%", left:-60, width:160, height:160, borderRadius:"50%", background:"rgba(124,58,237,0.04)", pointerEvents:"none" }} />
+      <div style={{ position:"fixed", top:-100, right:-100, width:340, height:340, borderRadius:"50%", background:"rgba(37,99,235,0.07)", pointerEvents:"none" }} />
+      <div style={{ position:"fixed", bottom:-80, left:-80, width:240, height:240, borderRadius:"50%", background:"rgba(8,145,178,0.05)", pointerEvents:"none" }} />
 
       <div style={{ width:"100%", maxWidth:420, paddingBottom:24, position:"relative" }}>
 
-        {/* ── LOGO ── */}
+        {/* LOGO */}
         <div style={{ textAlign:"center", marginBottom:28 }} className="animate-slide-up">
-          <div style={{
-            width:64, height:64, borderRadius:20,
-            background: GRADIENTS.primary,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:"1.8rem", fontWeight:900, color:"#fff",
-            margin:"0 auto 14px",
-            boxShadow:"0 8px 32px rgba(37,99,235,0.45)",
-            fontFamily:"'Syne',sans-serif",
-          }}>A</div>
+          <div style={{ width:64, height:64, borderRadius:20, background:GRADIENTS.primary, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem", fontWeight:900, color:"#fff", margin:"0 auto 14px", boxShadow:"0 8px 32px rgba(37,99,235,0.45)", fontFamily:"'Syne',sans-serif" }}>A</div>
           <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.6rem", color:"#fff", letterSpacing:"-0.02em" }}>
             ARSTM<span style={{ color:"#67e8f9" }}>Campus</span>
           </div>
-          <div style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.78rem", marginTop:6, letterSpacing:"0.01em" }}>
-            Votre campus · Votre réseau · Votre avenir
-          </div>
+          <div style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.78rem", marginTop:6 }}>Votre campus · Votre réseau · Votre avenir</div>
         </div>
 
-        {/* ── ONGLETS ── */}
+        {/* ONGLETS */}
         <div style={{ display:"flex", background:"rgba(255,255,255,0.07)", borderRadius:14, padding:5, marginBottom:20, gap:4 }} className="animate-slide-up">
           {[["login","Se connecter"],["register","Créer un compte"]].map(([v,l])=>(
             <button key={v} onClick={() => { setVue(v); setError(""); setRegStep(1); setRegOk(false); }} style={{
@@ -301,26 +338,23 @@ export default function Login() {
           ))}
         </div>
 
-        {/* ── CONNEXION ── */}
+        {/* CONNEXION */}
         {vue==="login" && (
           <div className="animate-scale-in" style={{ background:"#fff", borderRadius:22, padding:"26px 20px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)" }}>
             <div style={{ marginBottom:20 }}>
               <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem", color:C.navy }}>Bienvenue 👋</div>
               <div style={{ color:C.muted, fontSize:"0.8rem", marginTop:3 }}>Connecte-toi à ton espace ARSTM</div>
             </div>
-
             <ErrorBanner />
-
             <div style={{ marginBottom:12 }}>
               <span style={css.label}>Email</span>
               <input style={{ ...css.input, background:"#f8fafc" }} type="email" placeholder="prenom@arstm.ci"
                 value={email} onChange={e => { setEmail(e.target.value); setError(""); }} />
             </div>
-
             <div style={{ marginBottom:22 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
                 <span style={css.label}>Mot de passe</span>
-                <button style={{ background:"none", border:"none", cursor:"pointer", color:C.blue, fontSize:"0.76rem", fontFamily:"inherit", padding:0 }}>
+                <button onClick={() => setShowReset(true)} style={{ background:"none", border:"none", cursor:"pointer", color:C.blue, fontSize:"0.76rem", fontFamily:"inherit", padding:0 }}>
                   Oublié ?
                 </button>
               </div>
@@ -329,12 +363,11 @@ export default function Login() {
                   type={showPwd ? "text" : "password"} placeholder="••••••••"
                   value={pwd} onChange={e => { setPwd(e.target.value); setError(""); }}
                   onKeyDown={e => e.key === "Enter" && handleLogin()} />
-                <button onClick={() => setShow(!showPwd)} aria-label="Afficher/masquer le mot de passe" style={{ position:"absolute", right:11, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:"1rem" }}>
+                <button onClick={() => setShow(!showPwd)} aria-label="Afficher/masquer" style={{ position:"absolute", right:11, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:"1rem" }}>
                   {showPwd ? "🙈" : "👁"}
                 </button>
               </div>
             </div>
-
             <button onClick={handleLogin} disabled={loading} style={{
               width:"100%", padding:"13px", borderRadius:12, border:"none",
               background: loading ? "#94a3b8" : GRADIENTS.primary,
@@ -348,11 +381,9 @@ export default function Login() {
           </div>
         )}
 
-        {/* ── CRÉER UN COMPTE ── */}
+        {/* CRÉER UN COMPTE */}
         {vue==="register" && !regOk && (
           <div className="animate-scale-in" style={{ background:"#fff", borderRadius:22, padding:"22px 18px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)" }}>
-
-            {/* Étape 1 — Rôle */}
             {regStep===1 && (
               <>
                 <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", color:C.navy, marginBottom:4 }}>Créer mon compte</div>
@@ -364,9 +395,7 @@ export default function Login() {
                       borderRadius:14, border:`1.5px solid ${r.color}25`, background:r.bg,
                       cursor:"pointer", fontFamily:"inherit", textAlign:"left", transition:"all 0.15s",
                     }}>
-                      <div style={{ width:38, height:38, borderRadius:10, background:"rgba(255,255,255,0.8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.15rem", flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,0.08)" }}>
-                        {r.icon}
-                      </div>
+                      <div style={{ width:38, height:38, borderRadius:10, background:"rgba(255,255,255,0.8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.15rem", flexShrink:0 }}>{r.icon}</div>
                       <div style={{ flex:1 }}>
                         <div style={{ fontWeight:700, fontSize:"0.88rem", color:C.navy }}>{r.label}</div>
                         <div style={{ fontSize:"0.72rem", color:C.mid, marginTop:1 }}>{r.desc}</div>
@@ -378,98 +407,57 @@ export default function Login() {
               </>
             )}
 
-            {/* Étape 2 — Formulaire */}
             {regStep===2 && (
               <>
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16, paddingBottom:14, borderBottom:`1px solid ${C.border}` }}>
-                  <button onClick={() => { setRegStep(1); setError(""); }} style={{
-                    width:30, height:30, borderRadius:8, border:`1px solid ${C.border}`,
-                    background:C.surfaceAlt, cursor:"pointer", fontFamily:"inherit",
-                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.9rem", flexShrink:0,
-                  }}>←</button>
+                  <button onClick={() => { setRegStep(1); setError(""); }} style={{ width:30, height:30, borderRadius:8, border:`1px solid ${C.border}`, background:C.surfaceAlt, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.9rem", flexShrink:0 }}>←</button>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ width:32, height:32, borderRadius:8, background:roleInfo.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem" }}>
-                      {roleInfo.icon}
-                    </div>
+                    <div style={{ width:32, height:32, borderRadius:8, background:roleInfo.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem" }}>{roleInfo.icon}</div>
                     <div>
                       <div style={{ fontWeight:700, fontSize:"0.9rem", color:C.navy }}>{roleInfo.label}</div>
                       <div style={{ fontSize:"0.7rem", color:C.muted }}>Étape 2 sur 2</div>
                     </div>
                   </div>
                 </div>
-
                 <ErrorBanner />
-
                 <div style={{ background:"linear-gradient(135deg,#fefce8,#fef9c3)", border:"1px solid #fde68a", borderRadius:10, padding:"9px 12px", marginBottom:16, display:"flex", alignItems:"flex-start", gap:8 }}>
                   <span style={{ fontSize:"1rem", flexShrink:0 }}>⏳</span>
-                  <div style={{ fontSize:"0.77rem", color:"#78350f", lineHeight:1.5 }}>
-                    Activation sous <strong>24-48h</strong> après validation par l'Admin Plateforme.
-                  </div>
+                  <div style={{ fontSize:"0.77rem", color:"#78350f", lineHeight:1.5 }}>Activation sous <strong>24-48h</strong> après validation par l'Admin Plateforme.</div>
                 </div>
-
-                {/* Identité */}
                 <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                  <div style={{ flex:1 }}>
-                    <span style={css.label}>Prénom *</span>
-                    <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Edmond"
-                      value={prenom} onChange={e => setPrenom(e.target.value)} />
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <span style={css.label}>Nom *</span>
-                    <input style={{ ...css.input, background:C.surfaceAlt }} placeholder="DADIE"
-                      value={nom} onChange={e => setNom(e.target.value)} />
-                  </div>
+                  <div style={{ flex:1 }}><span style={css.label}>Prénom *</span><input style={{ ...css.input, background:C.surfaceAlt }} placeholder="Edmond" value={prenom} onChange={e => setPrenom(e.target.value)} /></div>
+                  <div style={{ flex:1 }}><span style={css.label}>Nom *</span><input style={{ ...css.input, background:C.surfaceAlt }} placeholder="DADIE" value={nom} onChange={e => setNom(e.target.value)} /></div>
                 </div>
-
                 <div style={{ marginBottom:10 }}>
                   <span style={css.label}>Email *</span>
-                  <input style={{ ...css.input, background:C.surfaceAlt }} type="email" placeholder="prenom@arstm.ci"
-                    value={emailR} onChange={e => setEmailR(e.target.value)} />
+                  <input style={{ ...css.input, background:C.surfaceAlt }} type="email" placeholder="prenom@arstm.ci" value={emailR} onChange={e => setEmailR(e.target.value)} />
                 </div>
-
                 <RoleSection />
-
-                {/* Séparateur contact */}
                 <div style={{ display:"flex", alignItems:"center", gap:10, margin:"14px 0 12px" }}>
                   <div style={{ flex:1, height:1, background:C.border }} />
                   <span style={{ fontSize:"0.72rem", color:C.muted, fontWeight:600, whiteSpace:"nowrap" }}>Coordonnées</span>
                   <div style={{ flex:1, height:1, background:C.border }} />
                 </div>
-
-                <PhoneInput label="Téléphone *"
-                  tel={telNum} setTel={setTelNum}
-                  code={telCode} setCode={c => { setTelCode(c); if (waSame) setWaCode(c); }} />
-
+                <PhoneInput label="Téléphone *" tel={telNum} setTel={setTelNum} code={telCode} setCode={c => { setTelCode(c); if (waSame) setWaCode(c); }} />
                 <div style={{ marginBottom:12 }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
                     <span style={css.label}>WhatsApp</span>
                     <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer" }}>
-                      <div onClick={() => setWaSame(!waSame)} style={{
-                        width:36, height:20, borderRadius:10, background:waSame?C.green:"#e2e8f0",
-                        position:"relative", transition:"background 0.2s", cursor:"pointer", flexShrink:0,
-                      }}>
+                      <div onClick={() => setWaSame(!waSame)} style={{ width:36, height:20, borderRadius:10, background:waSame?C.green:"#e2e8f0", position:"relative", transition:"background 0.2s", cursor:"pointer", flexShrink:0 }}>
                         <span style={{ position:"absolute", top:2, left:waSame?18:2, width:16, height:16, borderRadius:"50%", background:"#fff", boxShadow:"0 1px 3px rgba(0,0,0,0.2)", transition:"left 0.2s" }} />
                       </div>
                       <span style={{ fontSize:"0.74rem", color:C.mid }}>= Tél</span>
                     </label>
                   </div>
-                  {waSame ? (
-                    <div style={{ ...css.input, background:"#f0fdf4", color:C.green, fontSize:"0.83rem", display:"flex", alignItems:"center", gap:7, border:"1px solid #bbf7d0" }}>
-                      💚 <span>{telCode} {telNum || "Même numéro"}</span>
-                    </div>
-                  ) : (
-                    <PhoneInput label="" tel={waNum} setTel={setWaNum} code={waCode} setCode={setWaCode} />
-                  )}
+                  {waSame
+                    ? <div style={{ ...css.input, background:"#f0fdf4", color:C.green, fontSize:"0.83rem", display:"flex", alignItems:"center", gap:7, border:"1px solid #bbf7d0" }}>💚 <span>{telCode} {telNum || "Même numéro"}</span></div>
+                    : <PhoneInput label="" tel={waNum} setTel={setWaNum} code={waCode} setCode={setWaCode} />}
                 </div>
-
-                {/* Séparateur sécurité */}
                 <div style={{ display:"flex", alignItems:"center", gap:10, margin:"14px 0 12px" }}>
                   <div style={{ flex:1, height:1, background:C.border }} />
                   <span style={{ fontSize:"0.72rem", color:C.muted, fontWeight:600, whiteSpace:"nowrap" }}>Sécurité</span>
                   <div style={{ flex:1, height:1, background:C.border }} />
                 </div>
-
-                {/* Mot de passe + confirm */}
                 <div style={{ display:"flex", gap:8, marginBottom:18 }}>
                   <div style={{ flex:1 }}>
                     <span style={css.label}>Mot de passe *</span>
@@ -477,25 +465,16 @@ export default function Login() {
                       <input style={{ ...css.input, background:C.surfaceAlt, paddingRight:36 }}
                         type={showRegPwd ? "text" : "password"} placeholder="Min. 6 car."
                         value={password} onChange={e => setPassword(e.target.value)} />
-                      <button onClick={() => setShowRegPwd(!showRegPwd)} aria-label="Afficher" style={{ position:"absolute", right:9, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:"0.9rem" }}>
+                      <button onClick={() => setShowRegPwd(!showRegPwd)} style={{ position:"absolute", right:9, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:"0.9rem" }}>
                         {showRegPwd ? "🙈" : "👁"}
                       </button>
                     </div>
-                    {/* Strength bar */}
                     {password && (
                       <div style={{ marginTop:5 }}>
                         <div style={{ display:"flex", gap:3 }}>
-                          {[1,2,3,4].map(i => (
-                            <div key={i} style={{
-                              flex:1, height:3, borderRadius:99,
-                              background: i <= pwdStrength ? STRENGTH_COLOR[pwdStrength] : C.border,
-                              transition:"background 0.25s",
-                            }} />
-                          ))}
+                          {[1,2,3,4].map(i => <div key={i} style={{ flex:1, height:3, borderRadius:99, background: i <= pwdStrength ? STRENGTH_COLOR[pwdStrength] : C.border, transition:"background 0.25s" }} />)}
                         </div>
-                        <div style={{ fontSize:"0.68rem", color:STRENGTH_COLOR[pwdStrength], fontWeight:600, marginTop:2 }}>
-                          {STRENGTH_LABEL[pwdStrength]}
-                        </div>
+                        <div style={{ fontSize:"0.68rem", color:STRENGTH_COLOR[pwdStrength], fontWeight:600, marginTop:2 }}>{STRENGTH_LABEL[pwdStrength]}</div>
                       </div>
                     )}
                   </div>
@@ -503,7 +482,6 @@ export default function Login() {
                     <span style={css.label}>Confirmer *</span>
                     <input style={{ ...css.input, background:C.surfaceAlt }} type="password" placeholder="Répéter"
                       value={confirm} onChange={e => setConfirm(e.target.value)} />
-                    {/* Match indicator */}
                     {confirm && password && (
                       <div style={{ marginTop:5, fontSize:"0.68rem", fontWeight:600, color: confirm === password ? "#16a34a" : "#ef4444" }}>
                         {confirm === password ? "✓ Identiques" : "✗ Non identiques"}
@@ -511,7 +489,6 @@ export default function Login() {
                     )}
                   </div>
                 </div>
-
                 <button onClick={handleRegister} disabled={loading} style={{
                   width:"100%", padding:"13px", borderRadius:12, border:"none",
                   background: loading ? "#94a3b8" : `linear-gradient(135deg,${roleInfo.color||C.blue},${C.blue})`,
@@ -527,29 +504,17 @@ export default function Login() {
           </div>
         )}
 
-        {/* ── SUCCÈS ── */}
+        {/* SUCCÈS */}
         {vue==="register" && regOk && (
           <div className="animate-bounce-in" style={{ background:"#fff", borderRadius:22, padding:"32px 22px", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", textAlign:"center" }}>
             <div style={{ width:64, height:64, borderRadius:"50%", background:"#f0fdf4", border:"2px solid #bbf7d0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"2rem", margin:"0 auto 16px" }}>🎉</div>
             <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.15rem", color:C.navy, marginBottom:6 }}>Compte créé !</div>
-            <div style={{ fontSize:"0.82rem", color:C.muted, lineHeight:1.6, marginBottom:18 }}>
-              Votre demande est en cours de traitement.
-            </div>
+            <div style={{ fontSize:"0.82rem", color:C.muted, lineHeight:1.6, marginBottom:18 }}>Votre demande est en cours de traitement.</div>
             <div style={{ background:"#fefce8", border:"1px solid #fde68a", borderRadius:12, padding:"12px 14px", marginBottom:20, textAlign:"left" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                <span>⏳</span>
-                <span style={{ fontWeight:700, color:"#92400e", fontSize:"0.82rem" }}>Validation requise</span>
-              </div>
-              <div style={{ fontSize:"0.78rem", color:"#78350f", lineHeight:1.6 }}>
-                L'<strong>Admin Plateforme</strong> activera votre compte sous 24-48h ouvrables.
-              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}><span>⏳</span><span style={{ fontWeight:700, color:"#92400e", fontSize:"0.82rem" }}>Validation requise</span></div>
+              <div style={{ fontSize:"0.78rem", color:"#78350f", lineHeight:1.6 }}>L'<strong>Admin Plateforme</strong> activera votre compte sous 24-48h ouvrables.</div>
             </div>
-            <button onClick={reset} style={{
-              width:"100%", padding:"12px", borderRadius:12, border:"none",
-              background: GRADIENTS.primary,
-              color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.9rem",
-              cursor:"pointer", boxShadow:"0 4px 16px rgba(37,99,235,0.3)",
-            }}>
+            <button onClick={reset} style={{ width:"100%", padding:"12px", borderRadius:12, border:"none", background:GRADIENTS.primary, color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.9rem", cursor:"pointer", boxShadow:"0 4px 16px rgba(37,99,235,0.3)" }}>
               Aller à la connexion →
             </button>
           </div>

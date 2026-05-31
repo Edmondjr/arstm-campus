@@ -11,6 +11,12 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   if (!user) return null;
   const roleInfo = ROLES.find(r => r.id === user.role) || ROLES[0];
   const initials  = user.avatar || user.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() || "?";
+  // Privacy flags — default: WhatsApp visible, tel/email hidden (unless explicitly enabled)
+  const priv      = user.privacy || {};
+  const showTel   = !!user.tel      && priv.showTel === true;
+  const showWa    = !!user.whatsapp && priv.showWhatsapp !== false;
+  const showEmail = !!user.email    && priv.showEmail === true;
+  const contactCount = 1 + [showTel, showWa].filter(Boolean).length;
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end", justifyContent:"center", padding:0 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:"22px 22px 0 0", width:"100%", maxWidth:480, overflow:"hidden", boxShadow:"0 -8px 40px rgba(0,0,0,0.25)", paddingBottom:24 }}>
@@ -46,14 +52,14 @@ export function ProfilExterne({ user, onClose, onMessage }) {
             </div>
           )}
           {/* Actions */}
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${[true, user.tel, user.whatsapp].filter(Boolean).length},1fr)`, gap:8, marginBottom:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:`repeat(${contactCount},1fr)`, gap:8, marginBottom:10 }}>
             <button onClick={()=>onMessage&&onMessage(user)} style={{ padding:"11px 8px", borderRadius:12, background:`linear-gradient(135deg,${C.blue},${C.aqua})`, color:"#fff", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
               <span style={{ fontSize:"1.1rem" }}>💬</span>Message
             </button>
-            {user.tel && <a href={`tel:${user.tel}`} style={{ padding:"11px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark, border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>📞</span>Appeler</a>}
-            {user.whatsapp && <a href={`https://wa.me/${user.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{ padding:"11px 8px", borderRadius:12, background:"#f0fdf4", color:"#059669", border:"1px solid #bbf7d0", textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>💚</span>WhatsApp</a>}
+            {showTel && <a href={`tel:${(user.indicatif||"")}${user.tel}`} style={{ padding:"11px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark, border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>📞</span>Appeler</a>}
+            {showWa && <a href={`https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{ padding:"11px 8px", borderRadius:12, background:"#f0fdf4", color:"#059669", border:"1px solid #bbf7d0", textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>💚</span>WhatsApp</a>}
           </div>
-          {user.email && <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>✉️ {user.email}</a>}
+          {showEmail && <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>✉️ {user.email}</a>}
         </div>
       </div>
     </div>
@@ -336,9 +342,18 @@ export default function PageProfil({ profile, onLogout, setPage }) {
             {[["Nouvelles annonces","Alertes urgentes",true],["Messages privés","À chaque message reçu",true],["Activité sociale","Likes et commentaires",false],["Rappels EDT","30 min avant chaque cours",true]].map(([l,d,o],i)=><Toggle key={i} label={l} desc={d} defaultOn={o}/>)}
           </Card>
 
-          {/* Confidentialité */}
+          {/* Confidentialité — persisté dans Firestore */}
           <Card title="Confidentialité">
-            {[["Afficher mon téléphone","Sur mon profil public",false],["Afficher mon WhatsApp","Les autres peuvent me contacter",true],["Afficher mon email","Sur mon profil public",false],["Profil visible aux Alumni","Networking et opportunités",true]].map(([l,d,o],i)=><Toggle key={i} label={l} desc={d} defaultOn={o}/>)}
+            {[
+              ["showTel","Afficher mon téléphone","Bouton « Appeler » sur mon profil public",false],
+              ["showWhatsapp","Afficher mon WhatsApp","Les autres peuvent me contacter",true],
+              ["showEmail","Afficher mon email","Bouton « Email » sur mon profil public",false],
+              ["visibleAlumni","Profil visible aux Alumni","Networking et opportunités",true],
+            ].map(([key,l,d,def])=>(
+              <PrivacyToggle key={key} pkey={key} label={l} desc={d}
+                value={profile?.privacy?.[key]} defaultOn={def}
+                uid={profile?.uid} privacy={profile?.privacy} reloadProfile={reloadProfile}/>
+            ))}
           </Card>
 
           {/* Compte */}
@@ -428,6 +443,28 @@ function ContactRow({icon,label,val,green}){
       <span style={{fontSize:"0.85rem",color:val?(green?"#059669":C.dark):C.muted,display:"flex",alignItems:"center",gap:5}}>
         {val?<>{icon} {val}</>:"Non renseigné"}
       </span>
+    </div>
+  );
+}
+function PrivacyToggle({pkey,label,desc,value,defaultOn,uid,privacy,reloadProfile}){
+  const initial = value === undefined ? defaultOn : value;
+  const [on,setOn]=useState(initial);
+  const [saving,setSaving]=useState(false);
+  const toggle=async()=>{
+    const next=!on;
+    setOn(next); setSaving(true);
+    try {
+      await updateDocument("users",uid,{ privacy:{ ...(privacy||{}), [pkey]:next } });
+      if(reloadProfile) await reloadProfile(uid);
+    } catch(_){ setOn(!next); }
+    setSaving(false);
+  };
+  return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid #f8fafc`}}>
+      <div><div style={{fontSize:"0.85rem",color:C.dark,fontWeight:500}}>{label}</div><div style={{fontSize:"0.74rem",color:C.muted,marginTop:1}}>{desc}</div></div>
+      <button onClick={toggle} disabled={saving} style={{width:42,height:23,borderRadius:12,border:"none",cursor:"pointer",background:on?C.blue:"#e2e8f0",position:"relative",transition:"background 0.2s",flexShrink:0,opacity:saving?0.6:1}}>
+        <span style={{position:"absolute",top:2.5,left:on?21:2.5,width:18,height:18,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.2)",transition:"left 0.2s"}}/>
+      </button>
     </div>
   );
 }

@@ -18,8 +18,8 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   const showEmail = !!user.email    && priv.showEmail === true;
   const contactCount = 1 + [showTel, showWa].filter(Boolean).length;
   return (
-    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end", justifyContent:"center", padding:0 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:"22px 22px 0 0", width:"100%", maxWidth:480, maxHeight:"92vh", overflowY:"auto", boxShadow:"0 -8px 40px rgba(0,0,0,0.25)", paddingBottom:32 }} className="animate-slide-up">
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", paddingBottom:32 }} className="modal-enter">
         {/* Bannière */}
         <div style={{ background:`linear-gradient(135deg,${roleInfo.color}18,${roleInfo.color}35)`, padding:"24px 20px 18px", position:"relative" }}>
           <button onClick={onClose} style={{ position:"absolute", top:12, right:14, background:"rgba(255,255,255,0.85)", border:"none", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontSize:"0.85rem", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700 }}>✕</button>
@@ -229,9 +229,9 @@ export default function PageProfil({ profile, onLogout, setPage }) {
 
         {/* Corps du profil */}
         <div style={{background:"#fff",padding:"0 18px 18px"}}>
-          <div style={{display:"flex",alignItems:"flex-end",gap:14,marginTop:-28,marginBottom:14}}>
+          <div style={{display:"flex",flexDirection:"column",marginTop:-36,marginBottom:14}}>
             {/* Avatar */}
-            <div style={{position:"relative",flexShrink:0}}>
+            <div style={{position:"relative",flexShrink:0,width:72,marginBottom:10}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:`linear-gradient(135deg,${roleInfo.color},${C.aqua})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",fontWeight:700,color:"#fff",overflow:"hidden",border:"4px solid #fff",boxShadow:"0 4px 16px rgba(0,0,0,0.15)"}}>
                 {photoURL?<img src={photoURL} alt="av" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials}
               </div>
@@ -240,7 +240,7 @@ export default function PageProfil({ profile, onLogout, setPage }) {
                 <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoUpload}/>
               </label>}
             </div>
-            <div style={{flex:1,paddingBottom:4}}>
+            <div>
               <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1.1rem",color:C.navy,lineHeight:1.2}}>{profile?.name}</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
                 <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:100,fontSize:"0.72rem",fontWeight:700,background:roleInfo.bg,color:roleInfo.color}}>{roleInfo.icon} {roleInfo.label}</span>

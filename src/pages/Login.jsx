@@ -306,7 +306,8 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight:"100vh", background: GRADIENTS.login, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-start", padding:"24px 16px 40px", overflowY:"auto" }}>
+    <div style={{ position:"fixed", inset:0, background: GRADIENTS.login, overflowY:"auto" }}>
+    <div style={{ minHeight:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-start", padding:"24px 16px 40px" }}>
       {showReset && <ResetModal onClose={() => setShowReset(false)} />}
 
       {/* Decorative orbs */}
@@ -318,8 +319,8 @@ export default function Login() {
         {/* LOGO */}
         <div style={{ textAlign:"center", marginBottom:28 }} className="animate-slide-up">
           <div style={{ width:64, height:64, borderRadius:20, background:GRADIENTS.primary, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem", fontWeight:900, color:"#fff", margin:"0 auto 14px", boxShadow:"0 8px 32px rgba(37,99,235,0.45)", fontFamily:"'Syne',sans-serif" }}>A</div>
-          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.6rem", color:"#fff", letterSpacing:"-0.02em" }}>
-            ARSTM<span style={{ color:"#67e8f9" }}>Campus</span>
+          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.6rem", color:"#fff", letterSpacing:"-0.02em", lineHeight:1.1 }}>
+            ARSTM<br/><span style={{ color:"#67e8f9" }}>Campus</span>
           </div>
           <div style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.78rem", marginTop:6 }}>Votre campus · Votre réseau · Votre avenir</div>
         </div>
@@ -524,6 +525,7 @@ export default function Login() {
           ARSTM Campus v2.0 · Firebase · 2026
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -235,6 +235,7 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil, onShare }) {
 
 // ── Composer de post ──────────────────────────────────────────────────────────
 function PostComposer({ profile, onPublish, r }) {
+  const { user } = useAuth();
   const [text, setText]         = useState("");
   const [saving, setSaving]     = useState(false);
   const [mediaFile, setMedia]   = useState(null);
@@ -262,7 +263,7 @@ function PostComposer({ profile, onPublish, r }) {
     let mediaUrl = null;
     if (mediaFile) {
       setUploading(true);
-      const uid = profile.uid || "anon";
+      const uid = user?.uid || profile?.uid || "anon";
       const path = `posts/${uid}/${Date.now()}_${mediaFile.name}`;
       const task = uploadBytesResumable(ref(storage, path), mediaFile);
       await new Promise((resolve, reject) => {
@@ -336,11 +337,11 @@ function PostComposer({ profile, onPublish, r }) {
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-export default function PageSocial({ profile, setPage }) {
+export default function PageSocial({ profile, setPage, initialTab }) {
   const { user } = useAuth();
   const { data: posts, loading } = usePosts();
   const { data: allUsers } = useCollection("users", []);
-  const [tab, setTab]           = useState("fil");
+  const [tab, setTab]           = useState(initialTab || "groupes");
   const [viewUser, setViewUser] = useState(null);
   const [roleFilter, setRoleFilter] = useState("Tous");
   const [promoFilter, setPromoFilter] = useState("Tous");
@@ -454,11 +455,11 @@ export default function PageSocial({ profile, setPage }) {
       )}
 
       <div style={css.pageH}>Espace Social</div>
-      <div style={css.pageSub}>{posts.length} publications · Communauté ARSTM</div>
+      <div style={css.pageSub}>Groupes & Réseau · Communauté ARSTM</div>
 
       {/* Onglets */}
       <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:2 }}>
-        {[["fil","💬 Fil"],["messages","✉️ Messages"],["groupes","👥 Groupes"],["reseau","🌐 Réseau"]].map(([v,l]) => (
+        {[["groupes","👥 Groupes"],["reseau","🌐 Réseau"]].map(([v,l]) => (
           <button key={v} onClick={() => setTab(v)} style={{
             padding:"7px 16px", borderRadius:20, border:`1px solid ${tab===v?C.blue:C.border}`,
             background:tab===v?C.blue:"#fff", color:tab===v?"#fff":C.mid,
@@ -468,28 +469,8 @@ export default function PageSocial({ profile, setPage }) {
         ))}
       </div>
 
-      {/* ── MESSAGES ── */}
-      {tab==="messages" && <PageMessages profile={profile} floating={false}/>}
-
       {/* ── GROUPES ── */}
       {tab==="groupes" && <PageGroups profile={profile}/>}
-
-      {/* ── FIL ── */}
-      {tab==="fil" && (
-        <>
-          <PostComposer profile={profile} r={r} onPublish={publish}/>
-          {posts.map(p => (
-            <PostCard key={p.id} p={p} uid={user?.uid} profile={profile} onReact={react} onOpenProfil={openProfil} onShare={share}/>
-          ))}
-          {posts.length===0 && (
-            <div style={{ ...css.card, textAlign:"center", padding:48, color:C.muted }}>
-              <div style={{ fontSize:"2.5rem", marginBottom:12 }}>💬</div>
-              <div style={{ fontWeight:600, color:C.navy, marginBottom:6 }}>Aucune publication</div>
-              <div style={{ fontSize:"0.84rem" }}>Soyez le premier à partager quelque chose !</div>
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── RÉSEAU ── */}
       {tab==="reseau" && (

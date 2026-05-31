@@ -77,6 +77,7 @@ export default function App() {
   const [pendingCount, setPendingCount] = useState(0);
   const [showSearch, setShowSearch]   = useState(false);
   const [searchUser, setSearchUser]   = useState(null);
+  const [socialTab, setSocialTab]     = useState<string|undefined>(undefined);
   const { unread: notifUnread } = useNotifs(user?.uid);
 
   const goTo = (id) => {
@@ -132,12 +133,14 @@ export default function App() {
     </div>
   );
 
+  const goToReseau = () => { setSocialTab("reseau"); setPageState("social"); setDrawer(false); };
+
   const PAGE = {
-    accueil:    <Accueil      setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} />,
+    accueil:    <Accueil      setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} onGoToReseau={goToReseau} />,
     edt:        <PageEDT      profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     annonces:   <PageAnnonces profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     ressources: <PageRessources profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    social:     <PageSocial   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
+    social:     <PageSocial   profile={{...profile, role:effectiveRole}} setPage={goTo} initialTab={socialTab} />,
     alumni:     <PageAlumni   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     profil:     <PageProfil   profile={profile} onLogout={()=>setConfirmLogout(true)} setPage={goTo} />,
     aide:       <PageAide     profile={profile} setPage={goTo} />,
@@ -204,7 +207,7 @@ export default function App() {
         <nav style={{...css.nav, flexShrink:0}}>
           <div style={css.logo}>
             <div style={css.logoBox}>A</div>
-            ARSTM<span style={{color:C.blue}}>Campus</span>
+            <span style={{lineHeight:1.1}}>ARSTM<br/><span style={{color:C.blue,fontSize:"0.82em"}}>Campus</span></span>
           </div>
           <div style={css.tabs}>
             {navDesktop.map(([id, label]) => (
@@ -251,7 +254,7 @@ export default function App() {
         <div style={{flexShrink:0,background:"#fff",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:50,boxShadow:SHADOWS.sm}}>
           <div style={{...css.logo, fontSize:"0.95rem"}}>
             <div style={{...css.logoBox, width:26, height:26, borderRadius:7, fontSize:"0.75rem"}}>A</div>
-            ARSTM<span style={{color:C.blue}}>Campus</span>
+            <span style={{lineHeight:1.1}}>ARSTM<br/><span style={{color:C.blue,fontSize:"0.82em"}}>Campus</span></span>
           </div>
           <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"0.88rem",color:C.navy}}>
             {PAGE_TITLES[page] || ""}

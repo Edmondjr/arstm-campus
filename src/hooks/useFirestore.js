@@ -11,6 +11,9 @@ import {
   doc,
   serverTimestamp,
   limit,
+  increment,
+  arrayUnion as arrayUnionFb,
+  arrayRemove as arrayRemoveFb,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -101,6 +104,105 @@ export const approveUser = (uid) =>
   });
 export const rejectUser = (uid) =>
   updateDoc(doc(db, 'users', uid), { status: 'rejected' });
+
+// ── Comments ──────────────────────────────────────────────────────────────────
+export function useComments(postId) {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!postId) { setComments([]); setLoading(false); return; }
+    const q = query(
+      collection(db, 'posts', postId, 'comments'),
+      orderBy('createdAt', 'asc'),
+      limit(50)
+    );
+    return onSnapshot(q, s => {
+      setComments(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [postId]);
+  return { comments, loading };
+}
+
+export const addComment = async (postId, data) => {
+  await addDoc(collection(db, 'posts', postId, 'comments'), { ...data, createdAt: serverTimestamp() });
+  await updateDoc(doc(db, 'posts', postId), { commentCount: increment(1) });
+};
+
+export const deleteComment = async (postId, commentId, authorUid, currentUid) => {
+  if (authorUid !== currentUid) return;
+  await deleteDoc(doc(db, 'posts', postId, 'comments', commentId));
+  await updateDoc(doc(db, 'posts', postId), { commentCount: increment(-1) });
+};
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+export function useGroups() {
+  return useCollection('groups', [orderBy('lastAt', 'desc')]);
+}
+
+export function useGroupMessages(groupId) {
+  const [msgs, setMsgs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!groupId) { setMsgs([]); setLoading(false); return; }
+    const q = query(
+      collection(db, 'groups', groupId, 'messages'),
+      orderBy('createdAt', 'asc'),
+      limit(100)
+    );
+    return onSnapshot(q, s => {
+      setMsgs(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [groupId]);
+  return { msgs, loading };
+}
+
+export const createGroup = (data) =>
+  addDoc(collection(db, 'groups'), { ...data, createdAt: serverTimestamp(), lastAt: serverTimestamp() });
+
+export const joinGroup = (groupId, uid) =>
+  updateDoc(doc(db, 'groups', groupId), { members: arrayUnionFb(uid) });
+
+export const leaveGroup = (groupId, uid) =>
+  updateDoc(doc(db, 'groups', groupId), { members: arrayRemoveFb(uid) });
+
+export const sendGroupMessage = async (groupId, data) => {
+  await addDoc(collection(db, 'groups', groupId, 'messages'), { ...data, createdAt: serverTimestamp() });
+  await updateDoc(doc(db, 'groups', groupId), { lastMessage: data.text, lastAt: serverTimestamp() });
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export function useNotifs(uid) {
+  const [notifs, setNotifs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!uid) { setNotifs([]); setLoading(false); return; }
+    const q = query(
+      collection(db, 'notifications', uid, 'items'),
+      orderBy('createdAt', 'desc'),
+      limit(30)
+    );
+    return onSnapshot(q, s => {
+      setNotifs(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [uid]);
+  const unread = notifs.filter(n => !n.read).length;
+  return { notifs, unread, loading };
+}
+
+export const markNotifsRead = (uid) => {
+  const q = query(collection(db, 'notifications', uid, 'items'), where('read', '==', false));
+  return onSnapshot(q, s => {
+    s.docs.forEach(d => updateDoc(d.ref, { read: true }));
+  });
+};
+
+export const sendNotif = (toUid, data) =>
+  addDoc(collection(db, 'notifications', toUid, 'items'), {
+    ...data, read: false, createdAt: serverTimestamp(),
+  });
 
 export async function seedDemoData() {
   const annonces = [

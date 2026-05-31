@@ -291,5 +291,4 @@ export async function seedDemoData() {
   for (const r of ressources) await addDocument('ressources', r);
   for (const o of offres) await addDocument('offres', o);
   for (const p of posts) await addDocument('posts', p);
-  console.log('✅ Données insérées !');
 }

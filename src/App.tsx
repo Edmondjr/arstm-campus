@@ -1,7 +1,7 @@
-// src/App.jsx
+// src/App.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
-import { C, ROLES, css } from "./design";
+import { C, ROLES, SHADOWS, GRADIENTS, css } from "./design";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
 import PageEDT from "./pages/EDT";
@@ -47,7 +47,7 @@ const DESKTOP_NAV_BY_ROLE = {
   etudiant:       [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["social","💬 Social"],["alumni","🎓 Alumni"],["profil","👤 Profil"],["aide","❓ Aide"]],
   enseignant:     [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Mes cours"],["social","💬 Communauté"],["profil","👤 Profil"],["aide","❓ Aide"]],
   alumni:         [["accueil","🏠 Accueil"],["alumni","🎓 Espace Alumni"],["annonces","📢 Annonces"],["social","💬 Social"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  administration: [["accueil","🏠 Tableau de bord"],["annonces","📢 Annonces"],["edt","📅 EDT"],["ressources","📚 Ressources"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  administration: [["accueil","🏠 Accueil"],["annonces","📢 Annonces"],["edt","📅 EDT"],["ressources","📚 Ressources"],["profil","👤 Profil"],["aide","❓ Aide"]],
   superadmin:     [["accueil","🏠 Accueil"],["admin","⚙️ Admin"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["profil","👤 Profil"]],
   control:        [["admin","🎛 Centre de Contrôle"],["profil","👤 Profil"]],
   support:        [["admin","🎫 Centre de Support"],["profil","👤 Profil"]],
@@ -68,7 +68,6 @@ export default function App() {
   const [showMessages, setShowMessages] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  // Navigation centrale — utilisée par toutes les pages
   const goTo = (id) => {
     setPageState(id);
     setDrawer(false);
@@ -76,10 +75,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    const l = document.createElement("link");
-    l.rel = "stylesheet";
-    l.href = "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap";
-    document.head.appendChild(l);
     const onResize = () => setWinW(window.innerWidth);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -99,13 +94,12 @@ export default function App() {
     setPageState(modeId === "control" || modeId === "support" ? "admin" : "accueil");
   };
 
-  const navBottom  = NAV_BY_ROLE[effectiveRole]    || NAV_BY_ROLE.etudiant;
-  const moreItems  = MORE_BY_ROLE[effectiveRole]   || MORE_BY_ROLE.etudiant;
+  const navBottom  = NAV_BY_ROLE[effectiveRole]         || NAV_BY_ROLE.etudiant;
+  const moreItems  = MORE_BY_ROLE[effectiveRole]        || MORE_BY_ROLE.etudiant;
   const navDesktop = DESKTOP_NAV_BY_ROLE[effectiveRole] || DESKTOP_NAV_BY_ROLE.etudiant;
 
-  // Avatar — affiche photo si disponible, sinon initiales
   const avatarInitials = profile.avatar || profile.name?.slice(0,2).toUpperCase() || "?";
-  const AvatarEl = ({ size=28 }) => (
+  const AvatarEl = ({ size = 28 }) => (
     <div style={{
       width:size, height:size, borderRadius:"50%",
       background: profile.photoURL ? "transparent" : (roleInfo.bg || C.blueLight),
@@ -115,28 +109,26 @@ export default function App() {
       fontWeight:700, overflow:"hidden", flexShrink:0,
     }}>
       {profile.photoURL
-        ? <img src={profile.photoURL} alt="av" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        ? <img src={profile.photoURL} alt={profile.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
         : avatarInitials}
     </div>
   );
 
-  // Toutes les pages reçoivent setPage={goTo}
   const PAGE = {
-    accueil:    <Accueil    setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} />,
-    edt:        <PageEDT    profile={{...profile, role:effectiveRole}} setPage={goTo} />,
+    accueil:    <Accueil      setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} />,
+    edt:        <PageEDT      profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     annonces:   <PageAnnonces profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     ressources: <PageRessources profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    social:     <PageSocial profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    alumni:     <PageAlumni profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    profil:     <PageProfil profile={profile} onLogout={()=>setConfirmLogout(true)} setPage={goTo} />,
-    aide:       <PageAide   profile={profile} setPage={goTo} />,
-    admin:      <PageAdmin  profile={profile} activeMode={activeMode||"control"} setPage={goTo} />,
+    social:     <PageSocial   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
+    alumni:     <PageAlumni   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
+    profil:     <PageProfil   profile={profile} onLogout={()=>setConfirmLogout(true)} setPage={goTo} />,
+    aide:       <PageAide     profile={profile} setPage={goTo} />,
+    admin:      <PageAdmin    profile={profile} activeMode={activeMode||"control"} setPage={goTo} />,
   };
 
-  // ── Barre mode SuperAdmin ──
   const ModeSelectorBar = () => (
     <div style={{
-      background:"linear-gradient(135deg,#0f172a,#1e3a5f)",
+      background: GRADIENTS.dark,
       padding:"6px 16px", display:"flex", alignItems:"center",
       gap:8, overflowX:"auto", flexShrink:0,
     }}>
@@ -144,14 +136,14 @@ export default function App() {
         Mode :
       </span>
       {SUPER_MODES.map(m => {
-        const isActive = (activeMode||"control") === m.id;
+        const isActive = (activeMode || "control") === m.id;
         return (
-          <button key={m.id} onClick={()=>switchMode(m.id)} style={{
+          <button key={m.id} onClick={() => switchMode(m.id)} style={{
             padding:"4px 11px", borderRadius:20, fontSize:"0.74rem", fontWeight:600,
             cursor:"pointer", border:"none", whiteSpace:"nowrap", fontFamily:"inherit",
             background: isActive ? m.bg : "rgba(255,255,255,0.08)",
             color: isActive ? m.color : "rgba(255,255,255,0.55)",
-            boxShadow: isActive ? `0 0 0 1px ${m.color}50` : "none",
+            boxShadow: isActive ? `0 0 0 1.5px ${m.color}60` : "none",
             transition:"all 0.15s",
           }}>
             {m.icon} {m.label}
@@ -160,8 +152,8 @@ export default function App() {
       })}
       <div style={{marginLeft:"auto",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
         <span style={{fontSize:"0.68rem",color:"rgba(255,255,255,0.3)"}}>⚙️ Admin Plateforme</span>
-        {activeMode && activeMode!=="control" && (
-          <button onClick={()=>switchMode("control")} style={{padding:"3px 10px",borderRadius:20,fontSize:"0.71rem",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.65)",border:"none",cursor:"pointer",fontFamily:"inherit"}}>
+        {activeMode && activeMode !== "control" && (
+          <button onClick={() => switchMode("control")} style={{padding:"3px 10px",borderRadius:20,fontSize:"0.71rem",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.65)",border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
             ← Contrôle
           </button>
         )}
@@ -170,8 +162,8 @@ export default function App() {
   );
 
   const IncognitoBar = () => {
-    if (!isSuperAdmin || !activeMode || activeMode==="control" || activeMode==="support") return null;
-    const m = SUPER_MODES.find(x=>x.id===activeMode);
+    if (!isSuperAdmin || !activeMode || activeMode === "control" || activeMode === "support") return null;
+    const m = SUPER_MODES.find(x => x.id === activeMode);
     return (
       <div style={{background:`${m?.color}12`,borderBottom:`1px solid ${m?.color}25`,padding:"5px 16px",display:"flex",alignItems:"center",gap:8,flexShrink:0,fontSize:"0.77rem"}}>
         <span>{m?.icon}</span>
@@ -196,21 +188,19 @@ export default function App() {
             ARSTM<span style={{color:C.blue}}>Campus</span>
           </div>
           <div style={css.tabs}>
-            {navDesktop.map(([id,label]) => (
-              <button key={id+label} style={{...css.tab(page===id), fontFamily:"inherit"}} onClick={()=>goTo(id)}>
+            {navDesktop.map(([id, label]) => (
+              <button key={id+label} style={{...css.tab(page===id), fontFamily:"inherit"}} onClick={() => goTo(id)}>
                 {label}
               </button>
             ))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {/* Avatar cliquable → Profil */}
-            <div onClick={()=>goTo("profil")} style={{...css.userPill, cursor:"pointer"}} title="Mon profil">
+            <div onClick={() => goTo("profil")} style={{...css.userPill, cursor:"pointer"}} title="Mon profil">
               <AvatarEl size={28}/>
               <span style={{fontSize:"0.83rem",fontWeight:500,color:C.dark}}>{profile.name}</span>
               <span style={css.badge(roleInfo.bg||C.blueLight, roleInfo.color||C.blue)}>{roleInfo.icon}</span>
             </div>
-            {/* Déconnexion desktop */}
-            <button onClick={()=>setConfirmLogout(true)} style={{...css.btnGhost,color:C.red,fontSize:"0.8rem"}} title="Se déconnecter">
+            <button onClick={() => setConfirmLogout(true)} style={{...css.btnGhost,color:C.red,fontSize:"0.85rem"}} title="Se déconnecter">
               🚪
             </button>
           </div>
@@ -219,16 +209,15 @@ export default function App() {
 
       {/* ── MOBILE TOP BAR ── */}
       {isMobile && (
-        <div style={{flexShrink:0,background:"#fff",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:50,boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+        <div style={{flexShrink:0,background:"#fff",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:50,boxShadow:SHADOWS.sm}}>
           <div style={{...css.logo, fontSize:"0.95rem"}}>
             <div style={{...css.logoBox, width:26, height:26, borderRadius:7, fontSize:"0.75rem"}}>A</div>
             ARSTM<span style={{color:C.blue}}>Campus</span>
           </div>
           <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"0.88rem",color:C.navy}}>
-            {PAGE_TITLES[page]||""}
+            {PAGE_TITLES[page] || ""}
           </div>
-          {/* Avatar mobile → Profil */}
-          <div onClick={()=>goTo("profil")} style={{cursor:"pointer",borderRadius:"50%",border:`2px solid ${roleInfo.color||C.blue}20`}}>
+          <div onClick={() => goTo("profil")} style={{cursor:"pointer",borderRadius:"50%",border:`2px solid ${roleInfo.color||C.blue}25`,padding:1}}>
             <AvatarEl size={32}/>
           </div>
         </div>
@@ -236,7 +225,8 @@ export default function App() {
 
       {/* ── CONTENU ── */}
       <main style={{flex:1,overflowY:"auto",padding:isMobile?"14px 12px":"24px 16px",paddingBottom:isMobile?"72px":"24px"}}>
-        <div style={{maxWidth:1080,margin:"0 auto"}}>
+        {/* key={page} triggers re-mount → CSS animation plays on each navigation */}
+        <div key={page} className="page-enter" style={{maxWidth:1080,margin:"0 auto"}}>
           {PAGE[page] || PAGE.accueil}
         </div>
       </main>
@@ -250,39 +240,48 @@ export default function App() {
 
       {/* ── MOBILE BOTTOM NAV ── */}
       {isMobile && (
-        <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:500,background:"#fff",borderTop:`1px solid ${C.border}`,display:"flex",height:58,boxShadow:"0 -2px 10px rgba(0,0,0,0.07)"}}>
-          {navBottom.map(([id,icon,label]) => {
-            const isMore = id==="more";
-            const active = isMore ? drawer : page===id;
+        <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:500,background:"#fff",borderTop:`1px solid ${C.border}`,display:"flex",height:58,boxShadow:"0 -2px 12px rgba(0,0,0,0.08)"}}>
+          {navBottom.map(([id, icon, label]) => {
+            const isMore = id === "more";
+            const active = isMore ? drawer : page === id;
             return (
-              <button key={id+label} onClick={()=>isMore?setDrawer(!drawer):goTo(id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",borderTop:active?`2px solid ${C.blue}`:"2px solid transparent"}}>
-                <span style={{fontSize:"1.15rem",lineHeight:1}}>{icon}</span>
-                <span style={{fontSize:"0.6rem",fontWeight:600,color:active?C.blue:C.muted}}>{label}</span>
+              <button key={id+label} onClick={() => isMore ? setDrawer(!drawer) : goTo(id)} style={{
+                flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+                gap:2, border:"none", background:"transparent", cursor:"pointer", fontFamily:"inherit",
+                borderTop: active ? `2.5px solid ${C.blue}` : "2.5px solid transparent",
+                transition:"border-color 0.15s",
+              }}>
+                <span style={{fontSize:"1.15rem",lineHeight:1,transition:"transform 0.15s",transform:active?"scale(1.1)":"scale(1)"}}>{icon}</span>
+                <span style={{fontSize:"0.6rem",fontWeight:active?700:600,color:active?C.blue:C.muted,transition:"color 0.15s"}}>{label}</span>
               </button>
             );
           })}
         </nav>
       )}
 
-      {/* ── BOUTON FLOTTANT MESSAGES ── */}
-      <button onClick={()=>setShowMessages(!showMessages)} style={{
-        position:"fixed", bottom:isMobile?72:24, right:16, zIndex:800,
-        width:50, height:50, borderRadius:"50%",
-        background:`linear-gradient(135deg,${C.blue},${C.aqua})`,
-        color:"#fff", border:"none", cursor:"pointer",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:"1.3rem", boxShadow:"0 4px 16px rgba(37,99,235,0.4)",
-        transition:"transform 0.2s, opacity 0.2s",
-        transform:showMessages?"scale(0.88)":"scale(1)",
-      }}>
-        {showMessages?"✕":"💬"}
+      {/* ── FAB MESSAGES ── */}
+      <button
+        onClick={() => setShowMessages(!showMessages)}
+        aria-label={showMessages ? "Fermer les messages" : "Ouvrir les messages"}
+        style={{
+          position:"fixed", bottom:isMobile?72:24, right:16, zIndex:800,
+          width:50, height:50, borderRadius:"50%",
+          background: showMessages ? C.mid : GRADIENTS.primary,
+          color:"#fff", border:"none", cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:"1.3rem", boxShadow: showMessages ? SHADOWS.md : SHADOWS.blue,
+          transition:"all 0.22s cubic-bezier(0.22,1,0.36,1)",
+          transform: showMessages ? "scale(0.9) rotate(90deg)" : "scale(1) rotate(0deg)",
+        }}
+      >
+        {showMessages ? "✕" : "💬"}
       </button>
 
       {showMessages && (
         <>
-          <div onClick={()=>setShowMessages(false)} style={{position:"fixed",inset:0,zIndex:799,background:"rgba(0,0,0,0.18)"}}/>
-          <div style={{position:"fixed",bottom:isMobile?132:84,right:16,zIndex:800,width:isMobile?"calc(100vw - 32px)":390,height:isMobile?"70vh":530,borderRadius:18,overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
-            <PageMessages profile={profile} onClose={()=>setShowMessages(false)} floating={true}/>
+          <div onClick={() => setShowMessages(false)} style={{position:"fixed",inset:0,zIndex:799,background:"rgba(0,0,0,0.22)"}} className="animate-fade-in"/>
+          <div className="animate-slide-up" style={{position:"fixed",bottom:isMobile?132:84,right:16,zIndex:800,width:isMobile?"calc(100vw - 32px)":390,height:isMobile?"70vh":530,borderRadius:18,overflow:"hidden",boxShadow:SHADOWS["2xl"]}}>
+            <PageMessages profile={profile} onClose={() => setShowMessages(false)} floating={true}/>
           </div>
         </>
       )}
@@ -290,19 +289,18 @@ export default function App() {
       {/* ── DRAWER "PLUS" MOBILE ── */}
       {isMobile && drawer && (
         <>
-          <div onClick={()=>setDrawer(false)} style={{position:"fixed",inset:0,zIndex:290,background:"rgba(0,0,0,0.3)"}}/>
-          <div style={{position:"fixed",bottom:58,left:0,right:0,zIndex:295,background:"#fff",borderTop:`1px solid ${C.border}`,borderRadius:"18px 18px 0 0",padding:"14px 18px 16px",boxShadow:"0 -4px 20px rgba(0,0,0,0.12)"}}>
+          <div onClick={() => setDrawer(false)} style={{position:"fixed",inset:0,zIndex:290,background:"rgba(0,0,0,0.3)"}} className="animate-fade-in"/>
+          <div className="animate-slide-up" style={{position:"fixed",bottom:58,left:0,right:0,zIndex:295,background:"#fff",borderTop:`1px solid ${C.border}`,borderRadius:"18px 18px 0 0",padding:"14px 18px 16px",boxShadow:"0 -4px 24px rgba(0,0,0,0.14)"}}>
             <div style={{width:32,height:4,borderRadius:2,background:C.border,margin:"0 auto 14px"}}/>
             <div style={{fontSize:"0.72rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em",color:C.muted,marginBottom:10}}>Autres sections</div>
-            {moreItems.map(([id,icon,label]) => (
-              <button key={id+label} onClick={()=>goTo(id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",marginBottom:7,borderRadius:12,background:page===id?C.blueLight:C.surfaceAlt,border:`1px solid ${page===id?C.blueBorder:C.border}`,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+            {moreItems.map(([id, icon, label]) => (
+              <button key={id+label} onClick={() => goTo(id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",marginBottom:7,borderRadius:12,background:page===id?C.blueLight:C.surfaceAlt,border:`1px solid ${page===id?C.blueBorder:C.border}`,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all 0.15s"}}>
                 <span style={{fontSize:"1.2rem"}}>{icon}</span>
                 <span style={{fontWeight:600,fontSize:"0.9rem",color:page===id?C.blue:C.navy}}>{label}</span>
                 <span style={{marginLeft:"auto",color:C.muted}}>›</span>
               </button>
             ))}
-            {/* Déconnexion dans le drawer */}
-            <button onClick={()=>{setDrawer(false);setConfirmLogout(true);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:12,background:C.redLight,border:`1px solid ${C.redBorder}`,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginTop:4}}>
+            <button onClick={() => { setDrawer(false); setConfirmLogout(true); }} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:12,background:C.redLight,border:`1px solid ${C.redBorder}`,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginTop:4,transition:"all 0.15s"}}>
               <span style={{fontSize:"1.2rem"}}>🚪</span>
               <span style={{fontWeight:600,fontSize:"0.9rem",color:C.red}}>Se déconnecter</span>
             </button>
@@ -312,13 +310,13 @@ export default function App() {
 
       {/* ── MODAL CONFIRMATION DÉCONNEXION ── */}
       {confirmLogout && (
-        <div onClick={()=>setConfirmLogout(false)} style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:20,padding:"28px 22px",width:"100%",maxWidth:320,textAlign:"center",boxShadow:"0 24px 60px rgba(0,0,0,0.3)"}}>
+        <div onClick={() => setConfirmLogout(false)} style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}} className="animate-fade-in">
+          <div onClick={e => e.stopPropagation()} className="modal-enter" style={{background:"#fff",borderRadius:20,padding:"28px 22px",width:"100%",maxWidth:320,textAlign:"center",boxShadow:SHADOWS.modal}}>
             <div style={{width:56,height:56,borderRadius:"50%",background:"#fef2f2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",margin:"0 auto 14px"}}>👋</div>
             <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1.05rem",color:C.navy,marginBottom:6}}>Quitter ARSTM Campus ?</div>
             <p style={{fontSize:"0.83rem",color:C.muted,lineHeight:1.65,marginBottom:22}}>Vos données sont sauvegardées. Vous pouvez revenir à tout moment.</p>
             <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>setConfirmLogout(false)} style={{...css.btnSecondary,flex:1,padding:"11px"}}>Annuler</button>
+              <button onClick={() => setConfirmLogout(false)} style={{...css.btnSecondary,flex:1,padding:"11px"}}>Annuler</button>
               <button onClick={logout} style={{flex:1,padding:"11px",borderRadius:8,background:C.red,color:"#fff",border:"none",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",fontFamily:"inherit"}}>Déconnecter</button>
             </div>
           </div>

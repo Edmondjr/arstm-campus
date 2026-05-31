@@ -9,6 +9,7 @@ import { db } from "../firebase";
 const TYPE_META = {
   comment:  { icon:"💬", label:"a commenté votre publication", color:C.blue,   bg:C.blueLight },
   reaction: { icon:"❤️", label:"a réagi à votre publication",  color:"#dc2626", bg:"#fef2f2" },
+  share:    { icon:"🔁", label:"a partagé votre publication",   color:C.green,  bg:C.greenLight },
   message:  { icon:"✉️", label:"vous a envoyé un message",     color:C.aqua,   bg:"#ecfeff" },
   annonce:  { icon:"📢", label:"Nouvelle annonce urgente",      color:C.red,    bg:C.redLight },
   group:    { icon:"👥", label:"a rejoint votre groupe",        color:C.green,  bg:C.greenLight },

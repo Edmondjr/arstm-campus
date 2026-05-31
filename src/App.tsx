@@ -17,6 +17,8 @@ import PageAdmin from "./pages/Admin";
 import PageMessages from "./pages/Messages";
 import PageNotifications from "./pages/Notifications";
 import { useNotifs } from "./hooks/useFirestore";
+import GlobalSearch from "./components/GlobalSearch";
+import { ProfilExterne } from "./pages/Profil";
 
 const SUPER_MODES = [
   { id:"control",        icon:"🎛",  label:"Contrôle",       color:"#dc2626", bg:"#fef2f2" },
@@ -73,6 +75,8 @@ export default function App() {
   const [showMessages, setShowMessages] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [showSearch, setShowSearch]   = useState(false);
+  const [searchUser, setSearchUser]   = useState(null);
   const { unread: notifUnread } = useNotifs(user?.uid);
 
   const goTo = (id) => {
@@ -215,6 +219,11 @@ export default function App() {
             ))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {/* Recherche globale */}
+            <button onClick={() => setShowSearch(true)} title="Rechercher (membres, annonces, ressources, posts)"
+              style={{ width:36, height:36, borderRadius:"50%", border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.05rem", transition:"all 0.15s" }}>
+              🔍
+            </button>
             {/* Cloche notifications */}
             <button onClick={() => goTo("notifications")} title="Notifications"
               style={{ position:"relative", width:36, height:36, borderRadius:"50%", border:`1px solid ${C.border}`, background:page==="notifications"?C.blueLight:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.1rem", transition:"all 0.15s" }}>
@@ -248,6 +257,10 @@ export default function App() {
             {PAGE_TITLES[page] || ""}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <button onClick={() => setShowSearch(true)}
+              style={{ width:32, height:32, borderRadius:"50%", border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.95rem" }}>
+              🔍
+            </button>
             <button onClick={() => goTo("notifications")}
               style={{ position:"relative", width:32, height:32, borderRadius:"50%", border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem" }}>
               🔔
@@ -369,6 +382,22 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── RECHERCHE GLOBALE ── */}
+      {showSearch && (
+        <GlobalSearch
+          onClose={() => setShowSearch(false)}
+          onNavigate={goTo}
+          onOpenProfil={(u) => setSearchUser(u)}
+        />
+      )}
+      {searchUser && (
+        <ProfilExterne
+          user={searchUser}
+          onClose={() => setSearchUser(null)}
+          onMessage={() => { setSearchUser(null); setShowMessages(true); }}
+        />
       )}
 
     </div>

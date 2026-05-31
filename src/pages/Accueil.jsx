@@ -68,11 +68,27 @@ function FeedPost({ p, uid, onReact }) {
           </div>
         </div>
       </div>
-      <p style={{ fontSize:"0.88rem", lineHeight:1.7, color:C.dark, marginBottom:isLong?4:12 }}>{text}</p>
+      {p.texte && <p style={{ fontSize:"0.88rem", lineHeight:1.7, color:C.dark, marginBottom:isLong?4:12 }}>{text}</p>}
       {isLong && (
         <button onClick={() => setExpanded(!expanded)} style={{ background:"none", border:"none", color:C.blue, fontSize:"0.82rem", cursor:"pointer", padding:"0 0 10px", fontFamily:"inherit" }}>
           {expanded ? "Voir moins ▲" : "Voir plus ▼"}
         </button>
+      )}
+      {p.mediaUrl && (
+        <div style={{ marginBottom:10, borderRadius:12, overflow:"hidden", maxHeight:360 }}>
+          {p.mediaType === "video"
+            ? <video controls src={p.mediaUrl} style={{ width:"100%", maxHeight:320, background:"#000", display:"block" }}/>
+            : <img src={p.mediaUrl} alt="" style={{ width:"100%", maxHeight:360, objectFit:"cover", display:"block" }}/>}
+        </div>
+      )}
+      {p.sharedFrom && (
+        <div style={{ border:`1px solid ${C.border}`, borderRadius:12, padding:"10px 12px", marginBottom:10, background:C.surfaceAlt }}>
+          <div style={{ fontSize:"0.78rem", fontWeight:700, color:C.navy, marginBottom:4 }}>🔁 {p.sharedFrom.auteur}</div>
+          {p.sharedFrom.texte && <p style={{ fontSize:"0.82rem", lineHeight:1.6, color:C.dark, margin:0 }}>{p.sharedFrom.texte}</p>}
+          {p.sharedFrom.mediaUrl && p.sharedFrom.mediaType !== "video" && (
+            <img src={p.sharedFrom.mediaUrl} alt="" style={{ width:"100%", maxHeight:200, objectFit:"cover", borderRadius:8, marginTop:8, display:"block" }}/>
+          )}
+        </div>
       )}
       {total > 0 && (
         <div style={{ display:"flex", gap:4, marginBottom:8, flexWrap:"wrap" }}>

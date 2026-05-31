@@ -306,7 +306,7 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight:"100vh", background: GRADIENTS.login, display:"flex", alignItems:"center", justifyContent:"center", padding:16, overflowY:"auto" }}>
+    <div style={{ minHeight:"100vh", background: GRADIENTS.login, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-start", padding:"24px 16px 40px", overflowY:"auto" }}>
       {showReset && <ResetModal onClose={() => setShowReset(false)} />}
 
       {/* Decorative orbs */}

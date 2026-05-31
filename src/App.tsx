@@ -15,6 +15,8 @@ import PageProfil from "./pages/Profil";
 import PageAide from "./pages/Aide";
 import PageAdmin from "./pages/Admin";
 import PageMessages from "./pages/Messages";
+import PageNotifications from "./pages/Notifications";
+import { useNotifs } from "./hooks/useFirestore";
 
 const SUPER_MODES = [
   { id:"control",        icon:"🎛",  label:"Contrôle",       color:"#dc2626", bg:"#fef2f2" },
@@ -59,6 +61,7 @@ const PAGE_TITLES = {
   accueil:"Accueil", edt:"Emploi du temps", annonces:"Annonces",
   ressources:"Ressources", social:"Social", alumni:"Alumni",
   profil:"Mon Profil", aide:"Aide & Support", admin:"Administration",
+  notifications:"Notifications",
 };
 
 export default function App() {
@@ -70,6 +73,7 @@ export default function App() {
   const [showMessages, setShowMessages] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const { unread: notifUnread } = useNotifs(user?.uid);
 
   const goTo = (id) => {
     setPageState(id);
@@ -133,7 +137,8 @@ export default function App() {
     alumni:     <PageAlumni   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
     profil:     <PageProfil   profile={profile} onLogout={()=>setConfirmLogout(true)} setPage={goTo} />,
     aide:       <PageAide     profile={profile} setPage={goTo} />,
-    admin:      <PageAdmin    profile={profile} activeMode={activeMode||"control"} setPage={goTo} />,
+    admin:         <PageAdmin         profile={profile} activeMode={activeMode||"control"} setPage={goTo} />,
+    notifications: <PageNotifications profile={profile} onGoTo={goTo} />,
   };
 
   const ModeSelectorBar = () => (
@@ -210,6 +215,16 @@ export default function App() {
             ))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {/* Cloche notifications */}
+            <button onClick={() => goTo("notifications")} title="Notifications"
+              style={{ position:"relative", width:36, height:36, borderRadius:"50%", border:`1px solid ${C.border}`, background:page==="notifications"?C.blueLight:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.1rem", transition:"all 0.15s" }}>
+              🔔
+              {notifUnread > 0 && (
+                <span style={{ position:"absolute", top:-2, right:-2, minWidth:16, height:16, borderRadius:8, background:"#dc2626", color:"#fff", fontSize:"0.6rem", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px" }}>
+                  {notifUnread > 9 ? "9+" : notifUnread}
+                </span>
+              )}
+            </button>
             <div onClick={() => goTo("profil")} style={{...css.userPill, cursor:"pointer"}} title="Mon profil">
               <AvatarEl size={28}/>
               <span style={{fontSize:"0.83rem",fontWeight:500,color:C.dark}}>{profile.name}</span>
@@ -232,8 +247,19 @@ export default function App() {
           <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"0.88rem",color:C.navy}}>
             {PAGE_TITLES[page] || ""}
           </div>
-          <div onClick={() => goTo("profil")} style={{cursor:"pointer",borderRadius:"50%",border:`2px solid ${roleInfo.color||C.blue}25`,padding:1}}>
-            <AvatarEl size={32}/>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <button onClick={() => goTo("notifications")}
+              style={{ position:"relative", width:32, height:32, borderRadius:"50%", border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem" }}>
+              🔔
+              {notifUnread > 0 && (
+                <span style={{ position:"absolute", top:-2, right:-2, minWidth:14, height:14, borderRadius:7, background:"#dc2626", color:"#fff", fontSize:"0.55rem", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>
+                  {notifUnread > 9 ? "9+" : notifUnread}
+                </span>
+              )}
+            </button>
+            <div onClick={() => goTo("profil")} style={{cursor:"pointer",borderRadius:"50%",border:`2px solid ${roleInfo.color||C.blue}25`,padding:1}}>
+              <AvatarEl size={32}/>
+            </div>
           </div>
         </div>
       )}

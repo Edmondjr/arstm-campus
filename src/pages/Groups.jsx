@@ -116,7 +116,7 @@ export default function PageGroups({ profile }) {
   const { data: groups, loading } = useGroups();
   const [activeGroup, setActiveGroup] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ name:"", description:"", icon:"💬", color:"#2563eb" });
+  const [createForm, setCreateForm] = useState({ name:"", description:"", icon:"💬", color:"#2563eb", waGroupLink:"" });
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState("tous"); // "tous" | "mes"
 
@@ -131,12 +131,13 @@ export default function PageGroups({ profile }) {
       description: createForm.description.trim(),
       icon:        createForm.icon,
       color:       createForm.color,
+      waGroupLink: createForm.waGroupLink.trim() || null,
       members:     [uid],
       admins:      [uid],
       createdBy:   uid,
       lastMessage: "",
     });
-    setCreateForm({ name:"", description:"", icon:"💬", color:"#2563eb" });
+    setCreateForm({ name:"", description:"", icon:"💬", color:"#2563eb", waGroupLink:"" });
     setShowCreate(false); setCreating(false);
   };
 
@@ -204,6 +205,17 @@ export default function PageGroups({ profile }) {
               </div>
             </div>
           </div>
+          {/* Lien de groupe WhatsApp optionnel */}
+          <div style={{ marginBottom:14 }}>
+            <span style={css.label}>
+              📱 Lien de groupe WhatsApp <span style={{ color:C.muted, fontWeight:400 }}>(optionnel)</span>
+            </span>
+            <input style={css.input} placeholder="https://chat.whatsapp.com/…"
+              value={createForm.waGroupLink} onChange={e => setCreateForm({...createForm, waGroupLink:e.target.value})}/>
+            <div style={{ fontSize:"0.72rem", color:C.muted, marginTop:4 }}>
+              Créez d'abord le groupe sur WhatsApp, puis copiez le lien d'invitation ici.
+            </div>
+          </div>
           <button style={{ ...css.btnPrimary, opacity:creating?0.7:1 }} onClick={handleCreate} disabled={creating}>
             {creating ? "⏳ Création…" : "✅ Créer le groupe"}
           </button>
@@ -237,9 +249,16 @@ export default function PageGroups({ profile }) {
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontWeight:700, color:C.navy, fontSize:"0.92rem", marginBottom:2 }}>{g.name}</div>
                 {g.description && <div style={{ fontSize:"0.76rem", color:C.muted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{g.description}</div>}
-                <div style={{ display:"flex", gap:8, marginTop:4, alignItems:"center" }}>
+                <div style={{ display:"flex", gap:8, marginTop:4, alignItems:"center", flexWrap:"wrap" }}>
                   <span style={{ fontSize:"0.73rem", color:C.muted }}>👥 {g.members?.length||0} membres</span>
                   {g.lastMessage && <span style={{ fontSize:"0.73rem", color:C.muted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:160 }}>· {g.lastMessage}</span>}
+                  {g.waGroupLink && (
+                    <a href={g.waGroupLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                      style={{ fontSize:"0.7rem", color:"#059669", fontWeight:700, textDecoration:"none",
+                        padding:"2px 8px", borderRadius:20, background:"#f0fdf4", border:"1px solid #bbf7d0" }}>
+                      📱 Rejoindre sur WA
+                    </a>
+                  )}
                 </div>
               </div>
               <div style={{ flexShrink:0 }}>

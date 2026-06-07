@@ -1,11 +1,12 @@
 // src/pages/Alumni.jsx — offres enrichies + candidatures Firestore
 import { useState, useCallback, useEffect } from "react";
 import { C, css, ROLES, SHADOWS } from "../design";
-import { useOffres, addDocument, useCollection } from "../hooks/useFirestore";
+import { useOffres, addDocument, useCollection, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
 import { ProfilExterne } from "./Profil";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
+import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, increment } from "firebase/firestore";
+import { db, storage } from "../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const getRoleInfo = r => ROLES.find(x=>x.id===r)||{color:C.blue,bg:C.blueLight,icon:"👤",label:r};
 
@@ -145,43 +146,102 @@ function FormulaireOffre({ profile, onClose, onDone }) {
 function ModalCandidature({ offre, profile, onClose }) {
   const { user } = useAuth();
   const [form, setForm] = useState({
-    nom:     profile?.name || "",
-    email:   profile?.email || "",
-    tel:     profile?.tel   || "",
+    nom:     profile?.name    || "",
+    email:   profile?.email   || "",
+    tel:     profile?.tel     || "",
     message: "",
     filiere: profile?.filiere || "",
     promo:   profile?.promo   || "",
   });
-  const [saving,  setSaving]  = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [err,     setErr]     = useState("");
+  const [cvFile,    setCvFile]    = useState(null);
+  const [lmFile,    setLmFile]    = useState(null);
+  const [saving,    setSaving]    = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success,   setSuccess]   = useState(false);
+  const [err,       setErr]       = useState("");
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const pickFile = (setter) => (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { setErr("Fichier trop grand (max 5 Mo)."); return; }
+    setter(f);
+    setErr("");
+  };
 
   const handleSubmit = async () => {
     if (!form.nom.trim() || !form.email.trim()) { setErr("Nom et email obligatoires."); return; }
+    if (offre.cvReq && !cvFile) { setErr("Le CV est requis pour cette offre."); return; }
+    if (offre.lmReq && !lmFile) { setErr("La lettre de motivation est requise pour cette offre."); return; }
     setSaving(true);
     try {
+      let cvUrl = null, lmUrl = null;
+      if (cvFile || lmFile) setUploading(true);
+      if (cvFile) {
+        const r = ref(storage, `candidatures/${offre.id}/${user?.uid||"anon"}/cv_${Date.now()}_${cvFile.name}`);
+        await uploadBytes(r, cvFile);
+        cvUrl = await getDownloadURL(r);
+      }
+      if (lmFile) {
+        const r = ref(storage, `candidatures/${offre.id}/${user?.uid||"anon"}/lm_${Date.now()}_${lmFile.name}`);
+        await uploadBytes(r, lmFile);
+        lmUrl = await getDownloadURL(r);
+      }
+      setUploading(false);
+
       await addDoc(collection(db, "candidatures"), {
-        offreId:    offre.id,
-        offreTitre: offre.titre,
-        entreprise: offre.ent,
-        auteurOffre:offre.auteurUid || null,
-        candidatUid:user?.uid || null,
+        offreId:     offre.id,
+        offreTitre:  offre.titre,
+        entreprise:  offre.ent,
+        auteurOffre: offre.auteurUid || null,
+        candidatUid: user?.uid || null,
         ...form,
-        createdAt:  serverTimestamp(),
-        statut:     "nouveau",
+        cvUrl,
+        lmUrl,
+        createdAt: serverTimestamp(),
+        statut:    "nouveau",
       });
+
       // incrémenter compteur (best-effort)
-      try {
-        const { updateDoc, doc, increment } = await import("firebase/firestore");
-        await updateDoc(doc(db,"offres",offre.id), { candidaturesCount: increment(1) });
-      } catch(_) {}
+      try { await updateDoc(doc(db,"offres",offre.id), { candidaturesCount: increment(1) }); } catch(_) {}
+
+      // notifier le publieur de l'offre
+      if (offre.auteurUid) {
+        await sendNotif(offre.auteurUid, {
+          type:        "candidature",
+          icon:        "📝",
+          message:     `${form.nom} a postulé à « ${offre.titre} »`,
+          offreId:     offre.id,
+          candidatNom: form.nom,
+        });
+      }
+
       setSuccess(true);
     } catch(e) {
+      setUploading(false);
       setErr("Erreur lors de l'envoi. Réessayez.");
     }
     setSaving(false);
   };
+
+  const FileInput = ({ label, file, setter, required }) => (
+    <div style={{ marginBottom:10 }}>
+      <label style={css.label}>
+        {label} {required && <span style={{ color:C.red }}>*</span>}
+        {!required && <span style={{ color:C.muted, fontWeight:400 }}> (optionnel)</span>}
+      </label>
+      <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer",
+        padding:"10px 12px", background:file?"#f0fdf4":C.surfaceAlt,
+        borderRadius:10, border:`1px solid ${file?"#bbf7d0":C.border}`, transition:"all 0.15s" }}>
+        <span style={{ fontSize:"1.1rem" }}>{file ? "✅" : "📎"}</span>
+        <span style={{ fontSize:"0.83rem", color:file?"#059669":C.muted, flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+          {file ? file.name : "PDF, DOC, DOCX — max 5 Mo"}
+        </span>
+        {file && <button type="button" onClick={e=>{e.preventDefault();setter(null);}} style={{ border:"none",background:"none",cursor:"pointer",color:C.muted,fontSize:"0.8rem",padding:0 }}>✕</button>}
+        <input type="file" accept=".pdf,.doc,.docx,.odt" style={{ display:"none" }} onChange={pickFile(setter)}/>
+      </label>
+    </div>
+  );
 
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.55)",
@@ -195,7 +255,7 @@ function ModalCandidature({ offre, profile, onClose }) {
             <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem", color:C.navy, marginBottom:8 }}>Candidature envoyée !</div>
             <p style={{ fontSize:"0.85rem", color:C.muted, lineHeight:1.7, marginBottom:20 }}>
               Votre candidature pour <strong>{offre.titre}</strong> chez <strong>{offre.ent}</strong> a bien été transmise.<br/>
-              {offre.contact && <>Vous pouvez aussi contacter directement : <strong>{offre.contact}</strong></>}
+              {offre.contact && <>Contact direct : <strong>{offre.contact}</strong></>}
             </p>
             <button onClick={onClose} style={{ ...css.btnPrimary, borderRadius:12, padding:"12px 28px" }}>Fermer</button>
           </div>
@@ -210,13 +270,7 @@ function ModalCandidature({ offre, profile, onClose }) {
             </div>
 
             {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
-
-            {(offre.cvReq || offre.lmReq) && (
-              <div style={{ background:C.blueLight, borderRadius:10, padding:"9px 12px", marginBottom:14, fontSize:"0.8rem", color:C.blue }}>
-                📎 Documents requis : {[offre.cvReq&&"CV",offre.lmReq&&"Lettre de motivation"].filter(Boolean).join(" + ")}
-                {offre.contact && <div style={{ marginTop:4 }}>👉 Envoyez-les à : <strong>{offre.contact}</strong></div>}
-              </div>
-            )}
+            {uploading && <div style={{ background:C.blueLight, borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:C.blue }}>⏳ Envoi des fichiers…</div>}
 
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <div><label style={css.label}>Nom complet *</label>
@@ -234,15 +288,24 @@ function ModalCandidature({ offre, profile, onClose }) {
               <label style={css.label}>Promotion</label>
               <input style={css.input} value={form.promo} onChange={e=>set("promo",e.target.value)} placeholder="Ex: Promo 32"/>
             </div>
-            <div style={{ marginBottom:16 }}>
+            <div style={{ marginBottom:12 }}>
               <label style={css.label}>Lettre de motivation / Message</label>
-              <textarea style={{...css.input,resize:"none",minHeight:90}} placeholder="Présentez-vous et expliquez votre motivation…"
+              <textarea style={{...css.input,resize:"none",minHeight:80}} placeholder="Présentez-vous et expliquez votre motivation…"
                 value={form.message} onChange={e=>set("message",e.target.value)}/>
             </div>
 
-            <button onClick={handleSubmit} disabled={saving}
-              style={{ ...css.btnPrimary, width:"100%", padding:"13px", borderRadius:12, opacity:saving?0.7:1 }}>
-              {saving ? "Envoi…" : "Envoyer ma candidature →"}
+            {/* Uploads documents */}
+            <div style={{ background:C.surfaceAlt, borderRadius:12, padding:"12px 14px", marginBottom:16 }}>
+              <div style={{ fontSize:"0.78rem", fontWeight:700, color:C.navy, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.04em" }}>
+                📎 Documents
+              </div>
+              <FileInput label="CV" file={cvFile} setter={setCvFile} required={offre.cvReq}/>
+              <FileInput label="Lettre de motivation" file={lmFile} setter={setLmFile} required={offre.lmReq}/>
+            </div>
+
+            <button onClick={handleSubmit} disabled={saving||uploading}
+              style={{ ...css.btnPrimary, width:"100%", padding:"13px", borderRadius:12, opacity:(saving||uploading)?0.7:1 }}>
+              {saving ? "Envoi en cours…" : "Envoyer ma candidature →"}
             </button>
           </>
         )}
@@ -251,13 +314,92 @@ function ModalCandidature({ offre, profile, onClose }) {
   );
 }
 
-// ── Carte d'offre ───────────────────────────────────────────────────────────
-function CarteOffre({ offre, allUsers, onPostule, onViewAlumni }) {
-  const tc = TYPE_COLORS[offre.type] || TYPE_COLORS["Stage"];
-  const [open, setOpen] = useState(false);
-  const isExpired = offre.deadline && new Date(offre.deadline) < new Date();
+// ── Modal candidatures reçues (pour le publieur) ────────────────────────────
+function ModalCandidaturesRecues({ offre, onClose }) {
+  const [candidatures, setCandidatures] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "candidatures"), where("offreId","==",offre.id));
+    const unsub = onSnapshot(q, snap => {
+      const docs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      docs.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      setCandidatures(docs);
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [offre.id]);
+
+  const fmt = ts => ts?.toDate ? ts.toDate().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) : "";
 
   return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:4000, background:"rgba(0,0,0,0.6)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"40px 16px 24px", overflowY:"auto" }}>
+      <div onClick={e=>e.stopPropagation()} className="modal-enter"
+        style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:600, boxShadow:SHADOWS["2xl"],
+          padding:"26px 22px 28px", maxHeight:"85vh", overflowY:"auto" }}>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <div>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy }}>📋 Candidatures reçues</div>
+            <div style={{ fontSize:"0.8rem", color:C.muted }}>{offre.titre} · {offre.ent} · {candidatures.length} candidat{candidatures.length>1?"s":""}</div>
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign:"center", padding:40, color:C.muted }}>Chargement…</div>
+        ) : candidatures.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"40px 20px", color:C.muted }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:8 }}>📭</div>
+            <div style={{ fontWeight:600 }}>Aucune candidature pour l'instant.</div>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {candidatures.map(c => (
+              <div key={c.id} style={{ ...css.card, padding:"14px 16px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                  <div>
+                    <div style={{ fontWeight:700, color:C.navy, fontSize:"0.92rem" }}>{c.nom}</div>
+                    <div style={{ fontSize:"0.76rem", color:C.muted }}>
+                      {c.filiere}{c.promo ? ` · ${c.promo}` : ""}
+                    </div>
+                  </div>
+                  <span style={{ ...css.badge(C.greenLight, C.green), fontSize:"0.7rem", flexShrink:0 }}>
+                    {fmt(c.createdAt)}
+                  </span>
+                </div>
+                <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:c.message?8:0 }}>
+                  {c.email && <a href={`mailto:${c.email}`} style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>✉️ {c.email}</a>}
+                  {c.tel   && <a href={`tel:${c.tel}`}      style={{ ...css.badge(C.surfaceAlt, C.mid), textDecoration:"none" }}>📞 {c.tel}</a>}
+                  {c.cvUrl && <a href={c.cvUrl} target="_blank" rel="noreferrer" style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>📎 CV</a>}
+                  {c.lmUrl && <a href={c.lmUrl} target="_blank" rel="noreferrer" style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>✍️ LM</a>}
+                </div>
+                {c.message && (
+                  <div style={{ fontSize:"0.82rem", color:C.dark, background:C.surfaceAlt, borderRadius:8, padding:"8px 10px", lineHeight:1.65 }}>
+                    {c.message}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Carte d'offre ───────────────────────────────────────────────────────────
+function CarteOffre({ offre, allUsers, onPostule, onViewAlumni, currentUserUid }) {
+  const tc = TYPE_COLORS[offre.type] || TYPE_COLORS["Stage"];
+  const [open, setOpen] = useState(false);
+  const [showCandidatures, setShowCandidatures] = useState(false);
+  const isExpired  = offre.deadline && new Date(offre.deadline) < new Date();
+  const isMyOffre  = offre.auteurUid && offre.auteurUid === currentUserUid;
+
+  return (
+    <>
+      {showCandidatures && <ModalCandidaturesRecues offre={offre} onClose={() => setShowCandidatures(false)}/>}
     <div style={{ ...css.card, borderLeft:`4px solid ${tc.color}`, opacity:isExpired?0.6:1 }}>
       <div style={{ display:"flex", justifyContent:"space-between", gap:10, flexWrap:"wrap", marginBottom:8 }}>
         <div style={{ flex:1, minWidth:0 }}>
@@ -267,6 +409,7 @@ function CarteOffre({ offre, allUsers, onPostule, onViewAlumni }) {
             {offre.secteur && <span style={{ ...css.badge(C.goldLight, C.gold) }}>{offre.secteur}</span>}
             {offre.niveauReq && <span style={{ ...css.badge(C.surfaceAlt, C.mid) }}>🎓 {offre.niveauReq}</span>}
             {isExpired && <span style={{ ...css.badge(C.redLight, C.red) }}>Expiré</span>}
+            {isMyOffre && <span style={{ ...css.badge("#faf5ff","#7c3aed") }}>Ma publication</span>}
           </div>
           {/* Titre */}
           <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy, marginBottom:5 }}>{offre.titre}</div>
@@ -285,13 +428,20 @@ function CarteOffre({ offre, allUsers, onPostule, onViewAlumni }) {
             </button>
           )}
         </div>
-        {/* Bouton postuler */}
+        {/* Boutons */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
-          <button onClick={()=>!isExpired&&onPostule(offre)} disabled={isExpired}
-            style={{ ...css.btnPrimary, borderRadius:20, whiteSpace:"nowrap", opacity:isExpired?0.5:1 }}>
-            Postuler →
-          </button>
-          {!!offre.candidaturesCount && (
+          {isMyOffre ? (
+            <button onClick={() => setShowCandidatures(true)}
+              style={{ ...css.btnPrimary, borderRadius:20, whiteSpace:"nowrap", background:"#7c3aed" }}>
+              📋 {offre.candidaturesCount||0} candidature{(offre.candidaturesCount||0)!==1?"s":""}
+            </button>
+          ) : (
+            <button onClick={()=>!isExpired&&onPostule(offre)} disabled={isExpired}
+              style={{ ...css.btnPrimary, borderRadius:20, whiteSpace:"nowrap", opacity:isExpired?0.5:1 }}>
+              Postuler →
+            </button>
+          )}
+          {!isMyOffre && !!offre.candidaturesCount && (
             <span style={{ fontSize:"0.72rem", color:C.muted }}>{offre.candidaturesCount} candidat{offre.candidaturesCount>1?"s":""}</span>
           )}
         </div>
@@ -315,6 +465,7 @@ function CarteOffre({ offre, allUsers, onPostule, onViewAlumni }) {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -417,6 +568,7 @@ export default function PageAlumni({ profile, setPage }) {
                 allUsers={allUsers}
                 onPostule={setPostuleOn}
                 onViewAlumni={setViewUser}
+                currentUserUid={profile?.uid}
               />
             ))}
           </div>
@@ -451,7 +603,7 @@ export default function PageAlumni({ profile, setPage }) {
                     <a href={`https://wa.me/${a.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
                       onClick={e=>e.stopPropagation()}
                       style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:10,padding:"8px",borderRadius:10,background:"#f0fdf4",color:"#059669",border:"1px solid #bbf7d0",textDecoration:"none",fontSize:"0.8rem",fontWeight:600}}>
-                      💚 WhatsApp
+                      📱 WhatsApp
                     </a>
                   )}
                 </div>
@@ -491,7 +643,7 @@ export default function PageAlumni({ profile, setPage }) {
                       {a.whatsapp&&(
                         <a href={`https://wa.me/${a.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
                           style={{...css.btnSm,borderRadius:16,background:"#f0fdf4",color:"#059669",border:"1px solid #bbf7d0",textDecoration:"none"}}>
-                          💚 WhatsApp
+                          📱 WhatsApp
                         </a>
                       )}
                     </div>

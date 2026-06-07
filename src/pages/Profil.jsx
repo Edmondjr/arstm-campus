@@ -11,21 +11,24 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   if (!user) return null;
   const roleInfo = ROLES.find(r => r.id === user.role) || ROLES[0];
   const initials  = user.avatar || user.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() || "?";
-  // Privacy flags — default: WhatsApp visible, tel/email hidden (unless explicitly enabled)
+  // Privacy flags — tout visible par défaut, l'utilisateur peut désactiver dans Paramètres
   const priv      = user.privacy || {};
-  const showTel   = !!user.tel      && priv.showTel === true;
-  const showWa    = !!user.whatsapp && priv.showWhatsapp !== false;
-  const showEmail = !!user.email    && priv.showEmail === true;
-  // Construire les boutons de contact disponibles
-  const waHref  = showWa  ? `https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}` : null;
-  const telHref = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
-  // Bouton principal : WhatsApp si dispo, sinon SMS, sinon Email
-  const primaryHref   = waHref || (telHref ? `sms:${(user.indicatif||"")}${user.tel}` : `mailto:${user.email}`);
-  const primaryLabel  = waHref ? "WhatsApp" : telHref ? "SMS" : "Email";
-  const primaryIcon   = waHref ? "💚" : telHref ? "💬" : "✉️";
-  const primaryBg     = waHref ? "#f0fdf4" : telHref ? C.blueLight : C.surfaceAlt;
-  const primaryColor  = waHref ? "#059669" : telHref ? C.blue : C.mid;
-  const primaryBorder = waHref ? "#bbf7d0" : telHref ? C.blueBorder : C.border;
+  const showTel   = !!user.tel      && priv.showTel      !== false;
+  const showWa    = !!user.whatsapp && priv.showWhatsapp  !== false;
+  const showEmail = !!user.email    && priv.showEmail     !== false;
+  const waHref    = showWa  ? `https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}` : null;
+  const smsHref   = showTel ? `sms:${(user.indicatif||"")}${user.tel}` : null;
+  const telHref   = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
+
+  // Construire la liste de canaux de contact disponibles
+  const contacts = [
+    waHref    && { href:waHref,                    label:"WhatsApp", icon:"📱", bg:"#f0fdf4",   color:"#059669", border:"#bbf7d0", external:true },
+    smsHref   && { href:smsHref,                   label:"SMS",      icon:"💬", bg:C.blueLight,  color:C.blue,    border:C.blueBorder },
+    telHref   && { href:telHref,                   label:"Appeler",  icon:"📞", bg:C.surfaceAlt, color:C.dark,    border:C.border },
+    showEmail && { href:`mailto:${user.email}`,    label:"Email",    icon:"✉️", bg:C.surfaceAlt, color:C.mid,     border:C.border },
+  ].filter(Boolean);
+
+  const cols = contacts.length >= 3 ? 3 : contacts.length === 2 ? 2 : 1;
 
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
@@ -62,32 +65,23 @@ export function ProfilExterne({ user, onClose, onMessage }) {
             </div>
           )}
 
-          {/* Boutons de contact — pas de chat interne, on redirige vers les apps externes */}
-          <div style={{ display:"grid", gridTemplateColumns: showTel && waHref ? "1fr 1fr" : "1fr", gap:8, marginBottom:10 }}>
-            <a href={primaryHref} target={waHref?"_blank":undefined} rel="noreferrer"
-              style={{ padding:"13px 8px", borderRadius:12, background:primaryBg, color:primaryColor,
-                border:`1px solid ${primaryBorder}`, textDecoration:"none", fontFamily:"inherit",
-                fontWeight:700, fontSize:"0.82rem", display:"flex", flexDirection:"column",
-                alignItems:"center", gap:4, textAlign:"center" }}>
-              <span style={{ fontSize:"1.3rem" }}>{primaryIcon}</span>
-              {primaryLabel}
-            </a>
-            {showTel && waHref && (
-              <a href={telHref}
-                style={{ padding:"13px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark,
-                  border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit",
-                  fontWeight:600, fontSize:"0.82rem", display:"flex", flexDirection:"column",
-                  alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:"1.3rem" }}>📞</span>Appeler
-              </a>
-            )}
-          </div>
-          {showEmail && (
-            <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>
-              ✉️ {user.email}
-            </a>
-          )}
-          {!waHref && !showTel && !showEmail && (
+          {/* Boutons de contact — tous les canaux disponibles selon les préférences */}
+          {contacts.length > 0 ? (
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols},1fr)`, gap:8 }}>
+              {contacts.map(c => (
+                <a key={c.label} href={c.href} target={c.external?"_blank":undefined} rel="noreferrer"
+                  style={{ padding:"13px 8px", borderRadius:12, background:c.bg, color:c.color,
+                    border:`1px solid ${c.border}`, textDecoration:"none", fontFamily:"inherit",
+                    fontWeight:700, fontSize:"0.8rem", display:"flex", flexDirection:"column",
+                    alignItems:"center", gap:4, textAlign:"center", transition:"opacity 0.15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}
+                  onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <span style={{ fontSize:"1.3rem" }}>{c.icon}</span>
+                  {c.label}
+                </a>
+              ))}
+            </div>
+          ) : (
             <div style={{ textAlign:"center", padding:"10px 12px", background:C.surfaceAlt, borderRadius:10, fontSize:"0.82rem", color:C.muted }}>
               Aucune information de contact partagée publiquement.
             </div>
@@ -377,9 +371,9 @@ export default function PageProfil({ profile, onLogout, setPage }) {
           {/* Confidentialité — persisté dans Firestore */}
           <Card title="Confidentialité">
             {[
-              ["showTel","Afficher mon téléphone","Bouton « Appeler » sur mon profil public",false],
-              ["showWhatsapp","Afficher mon WhatsApp","Les autres peuvent me contacter",true],
-              ["showEmail","Afficher mon email","Bouton « Email » sur mon profil public",false],
+              ["showTel","Afficher mon téléphone","Bouton « Appeler/SMS » sur mon profil public",true],
+              ["showWhatsapp","Afficher mon WhatsApp","Les autres peuvent me contacter via WhatsApp",true],
+              ["showEmail","Afficher mon email","Bouton « Email » sur mon profil public",true],
               ["visibleAlumni","Profil visible aux Alumni","Networking et opportunités",true],
             ].map(([key,l,d,def])=>(
               <PrivacyToggle key={key} pkey={key} label={l} desc={d}

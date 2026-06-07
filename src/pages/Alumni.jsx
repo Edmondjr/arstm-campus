@@ -1,10 +1,10 @@
-// src/pages/Alumni.jsx — offres enrichies + candidatures Firestore
+// src/pages/Alumni.jsx — offres enrichies + candidatures + conseils carrière
 import { useState, useEffect } from "react";
 import { C, css, ROLES, SHADOWS } from "../design";
 import { useOffres, addDocument, useCollection, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
 import { ProfilExterne } from "./Profil";
-import { collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, increment } from "firebase/firestore";
+import { collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, deleteDoc, doc, increment, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 
 const getRoleInfo = r => ROLES.find(x=>x.id===r)||{color:C.blue,bg:C.blueLight,icon:"👤",label:r};
@@ -123,8 +123,25 @@ function FormulaireOffre({ profile, onClose, onDone }) {
 
         {/* ── Section "Comment postuler" ── */}
         <div style={{ background:C.surfaceAlt, borderRadius:14, padding:"16px", marginBottom:16, border:`1px solid ${C.border}` }}>
-          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.88rem", color:C.navy, marginBottom:14 }}>
-            📬 Comment postuler ?
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.88rem", color:C.navy }}>
+              📬 Comment postuler ?
+            </div>
+            {/* Raccourci global "= Le mien" */}
+            <label style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer",
+              background:C.blueLight, border:`1px solid ${C.blueBorder}`, borderRadius:20, padding:"4px 10px" }}>
+              <input type="checkbox" style={{ width:14, height:14, cursor:"pointer", accentColor:C.blue }}
+                onChange={e => {
+                  if (e.target.checked) {
+                    setEmailRecruteur(profile?.email || "");
+                    if (profile?.whatsapp || profile?.tel) {
+                      setWaIndicatif(profile?.waIndicatif || profile?.indicatif || "+225");
+                      setWaRecruteur(profile?.whatsapp || profile?.tel || "");
+                    }
+                  }
+                }}/>
+              <span style={{ fontSize:"0.74rem", fontWeight:700, color:C.blue }}>= Le mien</span>
+            </label>
           </div>
 
           {/* Email */}
@@ -462,6 +479,209 @@ function ModalCandidaturesRecues({ offre, onClose }) {
   );
 }
 
+// ── Conseils carrière ───────────────────────────────────────────────────────
+
+function useConseils() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const q = query(collection(db, "conseils"), orderBy("createdAt","desc"));
+    const unsub = onSnapshot(q, snap => {
+      setData(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+  return { data, loading };
+}
+
+const DOMAINES = ["Transit","Maritime","Logistique","Douanes","Supply Chain","Commerce International","Ressources Humaines","Finance","Autre"];
+
+function FormulaireConseil({ profile, editData, onClose }) {
+  const { user } = useAuth();
+  const [titre,    setTitre]   = useState(editData?.titre    || "");
+  const [domaine,  setDomaine] = useState(editData?.domaine  || "Transit");
+  const [contenu,  setContenu] = useState(editData?.contenu  || "");
+  const [saving,   setSaving]  = useState(false);
+  const [err,      setErr]     = useState("");
+
+  const handleSave = async () => {
+    if (!titre.trim() || !contenu.trim()) { setErr("Titre et contenu obligatoires."); return; }
+    setSaving(true);
+    try {
+      if (editData?.id) {
+        await updateDoc(doc(db, "conseils", editData.id), { titre:titre.trim(), domaine, contenu:contenu.trim() });
+      } else {
+        await addDoc(collection(db, "conseils"), {
+          titre:        titre.trim(),
+          domaine,
+          contenu:      contenu.trim(),
+          auteurUid:    user?.uid || profile?.uid,
+          auteurNom:    profile?.name || "Anonyme",
+          auteurPoste:  profile?.service || profile?.poste || "",
+          auteurPromo:  profile?.promo   || "",
+          auteurPhoto:  profile?.photoURL || null,
+          auteurAvatar: profile?.avatar  || (profile?.name||"?").slice(0,2).toUpperCase(),
+          likes:        0,
+          createdAt:    serverTimestamp(),
+        });
+      }
+      onClose();
+    } catch(e) { setErr("Erreur. Réessayez."); }
+    setSaving(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"40px 16px 24px", overflowY:"auto" }}>
+      <div onClick={e=>e.stopPropagation()} className="modal-enter"
+        style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:520, boxShadow:SHADOWS["2xl"], padding:"26px 22px 28px" }}>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy }}>
+            💡 {editData ? "Modifier le conseil" : "Donner un conseil carrière"}
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+        </div>
+
+        {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
+
+        <div style={{ marginBottom:12 }}>
+          <label style={css.label}>Titre du conseil *</label>
+          <input style={css.input} placeholder="Ex: Maîtrisez SYDAM dès votre stage" value={titre} onChange={e=>setTitre(e.target.value)}/>
+        </div>
+        <div style={{ marginBottom:12 }}>
+          <label style={css.label}>Domaine</label>
+          <select style={css.input} value={domaine} onChange={e=>setDomaine(e.target.value)}>
+            {DOMAINES.map(d=><option key={d}>{d}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <label style={css.label}>Votre conseil *</label>
+          <textarea style={{...css.input,resize:"none",minHeight:120}}
+            placeholder="Partagez votre expérience et vos conseils pour les étudiants et jeunes diplômés…"
+            value={contenu} onChange={e=>setContenu(e.target.value)}/>
+          <div style={{ textAlign:"right", fontSize:"0.72rem", color:C.muted, marginTop:2 }}>{contenu.length}/1000</div>
+        </div>
+
+        <button onClick={handleSave} disabled={saving}
+          style={{ ...css.btnPrimary, width:"100%", padding:"13px", borderRadius:12, opacity:saving?0.7:1 }}>
+          {saving ? "Enregistrement…" : editData ? "💾 Enregistrer les modifications" : "💡 Publier mon conseil →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ConseilCard({ c, currentUserUid, isAdmin, allUsers, onViewAlumni }) {
+  const [liked,      setLiked]    = useState(false);
+  const [showEdit,   setShowEdit] = useState(false);
+  const [confirming, setConfirm]  = useState(false);
+  const [warned,     setWarned]   = useState(false);
+
+  const isOwn = c.auteurUid === currentUserUid;
+  const canEdit   = isOwn;
+  const canDelete = isOwn || isAdmin;
+
+  const handleLike = async () => {
+    if (liked) return;
+    setLiked(true);
+    try { await updateDoc(doc(db,"conseils",c.id), { likes: increment(1) }); } catch(_) {}
+  };
+
+  const handleDelete = async () => {
+    try { await deleteDoc(doc(db,"conseils",c.id)); } catch(_) {}
+  };
+
+  const handleWarn = async () => {
+    if (!c.auteurUid) return;
+    await sendNotif(c.auteurUid, {
+      type:    "avertissement",
+      icon:    "⚠️",
+      message: `Votre conseil « ${c.titre} » a été signalé par l'administration comme inapproprié. Merci de respecter la charte de la communauté.`,
+    });
+    setWarned(true);
+  };
+
+  const authorUser = allUsers?.find(u => u.uid === c.auteurUid);
+  const fmt = ts => ts?.toDate ? ts.toDate().toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}) : "";
+
+  return (
+    <>
+      {showEdit && <FormulaireConseil profile={authorUser} editData={c} onClose={()=>setShowEdit(false)}/>}
+      <div style={{ ...css.card, borderLeft:`3px solid #f59e0b` }}>
+        <div style={{ display:"flex", gap:12, marginBottom:12 }}>
+          {/* Avatar */}
+          <div onClick={()=>authorUser&&onViewAlumni(authorUser)} style={{
+            width:44, height:44, borderRadius:"50%", flexShrink:0, cursor:authorUser?"pointer":"default",
+            background:c.auteurPhoto?"transparent":C.goldLight, color:C.gold,
+            display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:"0.9rem", overflow:"hidden",
+            border:`2px solid ${C.goldLight}`,
+          }}>
+            {c.auteurPhoto ? <img src={c.auteurPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (c.auteurAvatar||"?")}
+          </div>
+          {/* Méta */}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+              <div>
+                <span onClick={()=>authorUser&&onViewAlumni(authorUser)}
+                  style={{ fontWeight:700, color:C.navy, fontSize:"0.92rem", cursor:authorUser?"pointer":"default" }}>
+                  {c.auteurNom}
+                </span>
+                {c.auteurPoste && <div style={{ fontSize:"0.74rem", color:C.muted }}>{c.auteurPoste}{c.auteurPromo?" · "+c.auteurPromo:""}</div>}
+              </div>
+              <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+                <span style={{ ...css.badge(C.goldLight,C.gold), fontSize:"0.68rem" }}>{c.domaine}</span>
+                <span style={{ fontSize:"0.72rem", color:C.muted }}>{fmt(c.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Titre */}
+        <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, color:C.navy, marginBottom:8, fontSize:"0.95rem" }}>
+          💡 {c.titre}
+        </div>
+
+        {/* Contenu */}
+        <div style={{ fontSize:"0.85rem", color:C.dark, lineHeight:1.75, background:C.surfaceAlt, borderRadius:10, padding:"12px 14px", marginBottom:12, fontStyle:"italic" }}>
+          "{c.contenu}"
+        </div>
+
+        {/* Actions */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={handleLike} style={{
+              ...css.btnSm, borderRadius:16,
+              background:liked?"#fef3c7":"#fff", color:liked?C.gold:C.muted,
+              border:`1px solid ${liked?C.gold:C.border}`,
+            }}>
+              {liked?"⭐":"☆"} {(c.likes||0)+(liked?1:0)} utile{(c.likes||0)+(liked?1:0)>1?"s":""}
+            </button>
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            {canEdit && (
+              <button onClick={()=>setShowEdit(true)} style={{ ...css.btnSm, borderRadius:16, color:C.blue, border:`1px solid ${C.blueBorder}`, background:C.blueLight }}>
+                ✏️ Modifier
+              </button>
+            )}
+            {isAdmin && !isOwn && (
+              <button onClick={handleWarn} disabled={warned} style={{ ...css.btnSm, borderRadius:16, color:"#d97706", border:"1px solid #fde68a", background:"#fffbeb", opacity:warned?0.6:1 }}>
+                {warned?"✅ Averti":"⚠️ Avertir"}
+              </button>
+            )}
+            {canDelete && (
+              confirming
+                ? <button onClick={handleDelete} style={{ ...css.btnSm, borderRadius:16, color:"#fff", background:C.red, border:"none" }}>Confirmer suppression</button>
+                : <button onClick={()=>setConfirm(true)} style={{ ...css.btnSm, borderRadius:16, color:C.red, border:`1px solid ${C.redBorder}`, background:C.redLight }}>🗑 Supprimer</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Carte d'offre ───────────────────────────────────────────────────────────
 function CarteOffre({ offre, allUsers, onPostule, onViewAlumni, currentUserUid }) {
   const tc = TYPE_COLORS[offre.type] || TYPE_COLORS["Stage"];
@@ -547,16 +767,20 @@ function CarteOffre({ offre, allUsers, onPostule, onViewAlumni, currentUserUid }
 
 // ── Page principale ─────────────────────────────────────────────────────────
 export default function PageAlumni({ profile, setPage }) {
+  const { user } = useAuth();
   const role = profile?.role;
-  const { data: offres, loading } = useOffres();
-  const { data: allUsers }        = useCollection("users", []);
+  const { data: offres, loading }    = useOffres();
+  const { data: allUsers }           = useCollection("users", []);
+  const { data: conseils, loading: loadingConseils } = useConseils();
 
-  const [tab,        setTab]        = useState("offres");
-  const [showForm,   setShowForm]   = useState(false);
-  const [viewUser,   setViewUser]   = useState(null);
-  const [postuleOn,  setPostuleOn]  = useState(null);
-  const [filterType, setFilterType] = useState("Tous");
-  const [searchQ,    setSearchQ]    = useState("");
+  const [tab,          setTab]         = useState("offres");
+  const [showForm,     setShowForm]    = useState(false);
+  const [showConseil,  setShowConseil] = useState(false);
+  const [viewUser,     setViewUser]    = useState(null);
+  const [postuleOn,    setPostuleOn]   = useState(null);
+  const [filterType,   setFilterType]  = useState("Tous");
+  const [searchQ,      setSearchQ]     = useState("");
+  const [domaineFilter, setDomaineFilter] = useState("Tous");
 
   const canPublish = ["alumni","administration","superadmin"].includes(role);
   const isAdmin    = ["administration","superadmin"].includes(role);
@@ -582,21 +806,29 @@ export default function PageAlumni({ profile, setPage }) {
   return (
     <div>
       {/* Modals */}
-      {viewUser  && <ProfilExterne user={viewUser} onClose={()=>setViewUser(null)} onMessage={()=>setViewUser(null)}/>}
-      {postuleOn && <ModalCandidature offre={postuleOn} profile={profile} onClose={()=>setPostuleOn(null)}/>}
-      {showForm  && <FormulaireOffre profile={profile} onClose={()=>setShowForm(false)} onDone={()=>{}}/>}
+      {viewUser     && <ProfilExterne user={viewUser} onClose={()=>setViewUser(null)} onMessage={()=>setViewUser(null)}/>}
+      {postuleOn    && <ModalCandidature offre={postuleOn} profile={profile} onClose={()=>setPostuleOn(null)}/>}
+      {showForm     && <FormulaireOffre  profile={profile} onClose={()=>setShowForm(false)} onDone={()=>{}}/>}
+      {showConseil  && <FormulaireConseil profile={profile} onClose={()=>setShowConseil(false)}/>}
 
       {/* En-tête */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:20}}>
         <div>
           <div style={css.pageH}>Espace Alumni</div>
-          <div style={css.pageSub}>{offres.length} offre{offres.length>1?"s":""} · {displayAlumni.length} alumni · Réseau ARSTM</div>
+          <div style={css.pageSub}>{offres.length} offre{offres.length>1?"s":""} · {displayAlumni.length} alumni · {conseils.length} conseil{conseils.length>1?"s":""}</div>
         </div>
-        {canPublish && (
-          <button style={{...css.btnPrimary,borderRadius:20}} onClick={()=>setShowForm(true)}>
-            + Publier une offre
-          </button>
-        )}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {canPublish && tab==="offres" && (
+            <button style={{...css.btnPrimary,borderRadius:20}} onClick={()=>setShowForm(true)}>
+              + Publier une offre
+            </button>
+          )}
+          {canPublish && tab==="conseils" && (
+            <button style={{...css.btnPrimary,borderRadius:20,background:"#d97706"}} onClick={()=>setShowConseil(true)}>
+              💡 Donner un conseil
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Onglets */}
@@ -691,43 +923,50 @@ export default function PageAlumni({ profile, setPage }) {
 
       {/* ── CONSEILS ── */}
       {tab==="conseils" && (
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {displayAlumni.map((a,i)=>{
-            const r = getRoleInfo(a.role||"alumni");
-            const initials = a.avatar||a.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
-            return (
-              <div key={a.uid||i} style={css.card}>
-                <div style={{display:"flex",gap:12}}>
-                  <div onClick={()=>setViewUser(a)} style={{width:42,height:42,borderRadius:"50%",background:a.photoURL?"transparent":(a.bg||r.bg),color:a.fg||r.color,
-                    display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:"0.85rem",flexShrink:0,cursor:"pointer",overflow:"hidden"}}>
-                    {a.photoURL?<img src={a.photoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials}
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                      <div>
-                        <span onClick={()=>setViewUser(a)} style={{fontWeight:700,color:C.navy,cursor:"pointer",fontSize:"0.92rem"}}>{a.nom||a.name}</span>
-                        <div style={{fontSize:"0.75rem",color:C.muted,marginTop:1}}>{a.poste||""}{a.ent?" · "+a.ent:""}</div>
-                      </div>
-                      {(a.promo||a.filiere)&&<span style={{...css.badge(a.bg||r.bg,a.fg||r.color),fontSize:"0.68rem",flexShrink:0}}>{a.promo||a.filiere}</span>}
-                    </div>
-                    <div style={{background:C.surfaceAlt,borderRadius:10,padding:"10px 12px",marginTop:6}}>
-                      <div style={{fontSize:"0.72rem",color:C.muted,marginBottom:3,fontWeight:600}}>💡 Conseil karrière</div>
-                      <div style={{fontSize:"0.85rem",color:C.dark,lineHeight:1.65,fontStyle:"italic"}}>"{a.conseil||"Donnez le meilleur de vous-même chaque jour."}"</div>
-                    </div>
-                    <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                      <button onClick={()=>setViewUser(a)} style={{...css.btnSm,borderRadius:16}}>Voir profil →</button>
-                      {a.whatsapp&&(
-                        <a href={`https://wa.me/${a.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
-                          style={{...css.btnSm,borderRadius:16,background:"#f0fdf4",color:"#059669",border:"1px solid #bbf7d0",textDecoration:"none"}}>
-                          📱 WhatsApp
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
+        <div>
+          {/* Filtres domaine */}
+          <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+            {["Tous",...DOMAINES].map(d=>(
+              <button key={d} onClick={()=>setDomaineFilter(d)} style={{
+                padding:"5px 12px",borderRadius:16,fontSize:"0.76rem",fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+                border:`1px solid ${domaineFilter===d?C.gold:C.border}`,
+                background:domaineFilter===d?"#fef3c7":"#fff",
+                color:domaineFilter===d?C.gold:C.mid,
+              }}>{d}</button>
+            ))}
+          </div>
+
+          {loadingConseils ? (
+            <div style={{textAlign:"center",padding:48,color:C.muted}}>Chargement…</div>
+          ) : conseils.filter(c=>domaineFilter==="Tous"||c.domaine===domaineFilter).length === 0 ? (
+            <div style={{...css.card,textAlign:"center",padding:48}}>
+              <div style={{fontSize:"2.5rem",marginBottom:12}}>💡</div>
+              <div style={{fontWeight:700,color:C.navy,marginBottom:6}}>Aucun conseil publié</div>
+              <div style={{fontSize:"0.84rem",color:C.muted,marginBottom:16}}>
+                {canPublish?"Partagez votre expérience avec la communauté !":"Revenez bientôt."}
               </div>
-            );
-          })}
+              {canPublish && (
+                <button style={{...css.btnPrimary,borderRadius:20,background:"#d97706"}} onClick={()=>setShowConseil(true)}>
+                  💡 Donner un conseil →
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {conseils
+                .filter(c=>domaineFilter==="Tous"||c.domaine===domaineFilter)
+                .map(c=>(
+                  <ConseilCard
+                    key={c.id}
+                    c={c}
+                    currentUserUid={user?.uid || profile?.uid}
+                    isAdmin={isAdmin}
+                    allUsers={allUsers}
+                    onViewAlumni={setViewUser}
+                  />
+                ))}
+            </div>
+          )}
         </div>
       )}
     </div>

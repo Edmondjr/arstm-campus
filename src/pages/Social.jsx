@@ -11,7 +11,7 @@ import { storage } from "../firebase";
 
 const REACTIONS = ["❤️","👍","🔥","🙏","😂","😮","🎉","💯"];
 const MAX_LEN = 200;
-const MAX_IMG = 10 * 1024 * 1024;  // 10 Mo
+const MAX_IMG = 5 * 1024 * 1024;   // 5 Mo
 const MAX_VID = 50 * 1024 * 1024;  // 50 Mo
 
 const getRoleInfo = r => ROLES.find(x => x.id===r) || { color:C.blue, bg:C.blueLight, icon:"👤", label:r };
@@ -236,26 +236,87 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil, onShare }) {
 // ── Composer de post ──────────────────────────────────────────────────────────
 function PostComposer({ profile, onPublish, r }) {
   const { user } = useAuth();
-  const [text, setText]         = useState("");
-  const [saving, setSaving]     = useState(false);
-  const [mediaFile, setMedia]   = useState(null);
-  const [mediaPreview, setPreview] = useState(null);
-  const [mediaType, setType]    = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef();
+  const [text, setText]             = useState("");
+  const [saving, setSaving]         = useState(false);
+  const [mediaFile, setMedia]       = useState(null);
+  const [mediaPreview, setPreview]  = useState(null);
+  const [mediaType, setType]        = useState(null);
+  const [progress, setProgress]     = useState(0);
+  const [uploading, setUploading]   = useState(false);
+  // image editing state
+  const [rotation, setRotation]     = useState(0);   // multiples of 90
+  const [brightness, setBrightness] = useState(100); // 80–120
+  const [contrast, setContrast]     = useState(100); // 80–120
+  // video duration (seconds)
+  const [vidDuration, setVidDuration] = useState(null);
 
-  const handleMedia = (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    const isVideo = f.type.startsWith("video/");
-    const isImage = f.type.startsWith("image/");
-    if (!isVideo && !isImage) { alert("Image ou vidéo uniquement."); return; }
-    if (isImage && f.size > MAX_IMG) { alert("Image max 10 Mo."); return; }
-    if (isVideo && f.size > MAX_VID) { alert("Vidéo max 50 Mo."); return; }
+  const imgRef = useRef();
+  const vidRef = useRef();
+
+  const resetMedia = () => {
+    setMedia(null); setPreview(null); setType(null);
+    setRotation(0); setBrightness(100); setContrast(100);
+    setVidDuration(null);
+  };
+
+  const handleImage = (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { alert("Fichier image uniquement."); return; }
+    if (f.size > MAX_IMG) { alert("Image max 5 Mo."); return; }
+    resetMedia();
     setMedia(f);
-    setType(isVideo ? "video" : "image");
+    setType("image");
     setPreview(URL.createObjectURL(f));
   };
+
+  const handleVideo = (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("video/")) { alert("Fichier vidéo uniquement."); return; }
+    if (f.size > MAX_VID) { alert("Vidéo max 50 Mo."); return; }
+    const url = URL.createObjectURL(f);
+    const vid = document.createElement("video");
+    vid.preload = "metadata";
+    vid.src = url;
+    vid.onloadedmetadata = () => {
+      if (vid.duration > 30) {
+        URL.revokeObjectURL(url);
+        alert(`Vidéo trop longue (${Math.round(vid.duration)}s). Maximum 30 secondes.`);
+        return;
+      }
+      resetMedia();
+      setMedia(f);
+      setType("video");
+      setPreview(url);
+      setVidDuration(Math.round(vid.duration));
+    };
+  };
+
+  // Apply rotation + brightness/contrast to image via canvas, return Blob
+  const processImageFile = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const rad = (rotation * 90 * Math.PI) / 180;
+      const swapped = rotation % 2 !== 0;
+      const w = swapped ? img.naturalHeight : img.naturalWidth;
+      const h = swapped ? img.naturalWidth  : img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    };
+    img.src = url;
+  });
 
   const publish = async () => {
     if (!text.trim() && !mediaFile) return;
@@ -264,11 +325,16 @@ function PostComposer({ profile, onPublish, r }) {
     if (mediaFile) {
       setUploading(true);
       const uid = user?.uid || profile?.uid || "anon";
-      const path = `posts/${uid}/${Date.now()}_${mediaFile.name}`;
-      const task = uploadBytesResumable(ref(storage, path), mediaFile);
+      let uploadFile = mediaFile;
+      if (mediaType === "image") {
+        const blob = await processImageFile(mediaFile);
+        uploadFile = new File([blob], mediaFile.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+      }
+      const path = `posts/${uid}/${Date.now()}_${uploadFile.name}`;
+      const task = uploadBytesResumable(ref(storage, path), uploadFile);
       await new Promise((resolve, reject) => {
         task.on("state_changed",
-          snap => setProgress(Math.round(snap.bytesTransferred/snap.totalBytes*100)),
+          snap => setProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
           reject,
           async () => { mediaUrl = await getDownloadURL(task.snapshot.ref); resolve(); }
         );
@@ -276,8 +342,13 @@ function PostComposer({ profile, onPublish, r }) {
       setUploading(false);
     }
     await onPublish(text.trim(), mediaUrl, mediaType);
-    setText(""); setMedia(null); setPreview(null); setType(null); setProgress(0);
+    setText(""); resetMedia(); setProgress(0);
     setSaving(false);
+  };
+
+  const btnEdit = {
+    padding: "4px 10px", borderRadius: 8, border: `1px solid ${C.border}`,
+    background: "transparent", cursor: "pointer", fontSize: "0.8rem",
   };
 
   return (
@@ -295,13 +366,51 @@ function PostComposer({ profile, onPublish, r }) {
 
       {/* Aperçu média */}
       {mediaPreview && (
-        <div style={{ position:"relative", marginBottom:10, borderRadius:12, overflow:"hidden" }}>
-          {mediaType==="video"
-            ? <video src={mediaPreview} controls style={{ width:"100%", maxHeight:200, objectFit:"cover" }}/>
-            : <img src={mediaPreview} alt="preview" style={{ width:"100%", maxHeight:200, objectFit:"cover" }}/>
-          }
-          <button onClick={() => { setMedia(null); setPreview(null); setType(null); }}
-            style={{ position:"absolute", top:8, right:8, width:28, height:28, borderRadius:"50%", background:"rgba(0,0,0,0.55)", color:"#fff", border:"none", cursor:"pointer", fontSize:"0.85rem", display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+        <div style={{ marginBottom:10 }}>
+          <div style={{ position:"relative", borderRadius:12, overflow:"hidden" }}>
+            {mediaType === "video"
+              ? <video src={mediaPreview} controls style={{ width:"100%", maxHeight:200, objectFit:"cover" }}/>
+              : <img src={mediaPreview} alt="preview"
+                  style={{ width:"100%", maxHeight:200, objectFit:"cover",
+                    transform:`rotate(${rotation * 90}deg)`,
+                    filter:`brightness(${brightness}%) contrast(${contrast}%)`,
+                    transition:"transform 0.2s, filter 0.2s" }}/>
+            }
+            {/* Duration badge for video */}
+            {mediaType === "video" && vidDuration !== null && (
+              <span style={{ position:"absolute", bottom:8, left:8, background:"rgba(0,0,0,0.65)",
+                color:"#fff", borderRadius:8, padding:"2px 8px", fontSize:"0.78rem" }}>
+                ⏱ {vidDuration}s
+              </span>
+            )}
+            <button onClick={resetMedia}
+              style={{ position:"absolute", top:8, right:8, width:28, height:28, borderRadius:"50%",
+                background:"rgba(0,0,0,0.55)", color:"#fff", border:"none", cursor:"pointer",
+                fontSize:"0.85rem", display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+          </div>
+
+          {/* Image editing controls */}
+          {mediaType === "image" && (
+            <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:8,
+              padding:"10px 12px", background:C.bg, borderRadius:10, border:`1px solid ${C.border}` }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <button style={btnEdit} onClick={() => setRotation(r => (r - 1 + 4) % 4)}>↺ Gauche</button>
+                <button style={btnEdit} onClick={() => setRotation(r => (r + 1) % 4)}>↻ Droite</button>
+              </div>
+              <label style={{ fontSize:"0.78rem", color:C.muted }}>
+                Luminosité : {brightness}%
+                <input type="range" min={80} max={120} value={brightness}
+                  onChange={e => setBrightness(Number(e.target.value))}
+                  style={{ display:"block", width:"100%", marginTop:2 }}/>
+              </label>
+              <label style={{ fontSize:"0.78rem", color:C.muted }}>
+                Contraste : {contrast}%
+                <input type="range" min={80} max={120} value={contrast}
+                  onChange={e => setContrast(Number(e.target.value))}
+                  style={{ display:"block", width:"100%", marginTop:2 }}/>
+              </label>
+            </div>
+          )}
         </div>
       )}
 
@@ -317,15 +426,18 @@ function PostComposer({ profile, onPublish, r }) {
 
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", gap:6 }}>
-          <button onClick={() => fileRef.current.click()}
+          <button onClick={() => imgRef.current.click()}
             style={{ ...css.btnGhost, fontSize:"0.8rem", color:C.muted, display:"flex", alignItems:"center", gap:4 }}>
             📷 Photo
           </button>
-          <button onClick={() => fileRef.current.click()}
+          <button onClick={() => vidRef.current.click()}
             style={{ ...css.btnGhost, fontSize:"0.8rem", color:C.muted, display:"flex", alignItems:"center", gap:4 }}>
             🎬 Vidéo
           </button>
-          <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display:"none" }} onChange={handleMedia}/>
+          <input ref={imgRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+            style={{ display:"none" }} onChange={handleImage}/>
+          <input ref={vidRef} type="file" accept="video/mp4,video/webm,video/quicktime"
+            style={{ display:"none" }} onChange={handleVideo}/>
         </div>
         <button style={{ ...css.btnPrimary, opacity:(saving||(!text.trim()&&!mediaFile))?0.6:1, borderRadius:20 }}
           onClick={publish} disabled={saving||(!text.trim()&&!mediaFile)}>

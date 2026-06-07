@@ -213,26 +213,56 @@ export default function Login() {
       <>
         <div style={{ marginBottom:10 }}>
           <span style={css.label}>Filière</span>
-          <select style={{ ...css.input, background:C.surfaceAlt }} value={filiere} onChange={e => setFiliere(e.target.value)}>
-            <option value="">Choisir...</option>
-            <optgroup label="LPTML">
-              <option value="LPTML - Port Manutention">Port Manutention</option>
-              <option value="LPTML - Transit et Consignation">Transit et Consignation</option>
-              <option value="LPTML - Armement">Armement</option>
-              <option value="LPTML - Transport Multimodal">Transport Multimodal</option>
+          <select style={{ ...css.input, background:C.surfaceAlt, marginBottom:8 }}
+            value={filiere} onChange={e => setFiliere(e.target.value)}>
+            <option value="">Choisir une filière...</option>
+            <optgroup label="── LPTML">
+              <option value="LPTML - 1ère Année">LPTML - 1ère Année</option>
+              <option value="LPTML - Port Manutention 2e Année">LPTML PM2</option>
+              <option value="LPTML - Port Manutention 3e Année">LPTML PM3</option>
+              <option value="LPTML - Transit Consignation et Armement 2e Année">LPTML TCA2</option>
+              <option value="LPTML - Transit Consignation et Armement 3e Année">LPTML TCA3</option>
+              <option value="LPTML - Transport Multimodal 2e Année">LPTML TM2</option>
+              <option value="LPTML - Transport Multimodal 3e Année">LPTML TM3</option>
             </optgroup>
-            <optgroup label="MPTML">
-              <option value="MPTML - Gestion Maritime et Portuaire">Gestion Maritime et Portuaire</option>
-              <option value="MPTML - Logistique et Transport">Logistique et Transport</option>
+            <optgroup label="── MPTML">
+              <option value="MPTML - Gestion Portuaire et Maritime 1ère Année">MPTML GPM1</option>
+              <option value="MPTML - Gestion Portuaire et Maritime 2e Année">MPTML GPM2</option>
+              <option value="MPTML - Logistique et Transport 1ère Année">MPTML LT1</option>
+              <option value="MPTML - Logistique et Transport 2e Année">MPTML LT2</option>
             </optgroup>
-            <optgroup label="Sciences Nautiques">
-              <option value="LPSN">Licence (LPSN)</option><option value="MPSN">Master (MPSN)</option>
+            <optgroup label="── Sciences Nautiques">
+              <option value="LPSN – Sciences Nautiques 1ère Année">LPSN 1</option>
+              <option value="LPSN – Sciences Nautiques 2e Année">LPSN 2</option>
+              <option value="LPSN – Sciences Nautiques 3e Année">LPSN 3</option>
+              <option value="MPSN – Capitaine au long cours">CLC</option>
+              <option value="PC 750">PC 750</option>
+              <option value="CHEF DE QUART">CDQ</option>
+              <option value="ELEVE CHEF DE QUART">ECQD</option>
             </optgroup>
-            <optgroup label="Mecanique Navale">
-              <option value="LPMN">Licence (LPMN)</option><option value="MPMN">Master (MPMN)</option>
+            <optgroup label="── Mécanique Navale">
+              <option value="LPMN – Mécanique Navale 1ère Année">LPMN 1</option>
+              <option value="LPMN – Mécanique Navale 2e Année">LPMN 2</option>
+              <option value="LPMN – Mécanique Navale 3e Année">LPMN 3</option>
+              <option value="MPMN – Officier Mécanicien 1ère Classe">OM1</option>
+              <option value="MPMN – Officier Mécanicien 2e Classe">OM2</option>
             </optgroup>
-            <optgroup label="Autres">
-              <option value="CEAM">CEAM</option><option value="FOAD">FOAD</option><option value="FC">Formation Continue</option>
+            <optgroup label="── Génie Thermique">
+              <option value="LPGT – Génie Thermique 1ère Année">LPGT 1</option>
+              <option value="LPGT – Génie Thermique 2e Année">LPGT 2</option>
+              <option value="LPGT – Génie Thermique 3e Année">LPGT 3</option>
+            </optgroup>
+            <optgroup label="── Réseau Informatique et Télécom">
+              <option value="LPRIT – Réseau Informatique et Télécom 1ère Année">LPRIT 1</option>
+              <option value="LPRIT – Réseau Informatique et Télécom 2e Année">LPRIT 2</option>
+              <option value="LPRIT – Réseau Informatique et Télécom 3e Année">LPRIT 3</option>
+            </optgroup>
+            <optgroup label="── CEAM">
+              <option value="CEAM – Matelot Polyvalent">CAM POLY</option>
+            </optgroup>
+            <optgroup label="── Autres">
+              <option value="FOAD">FOAD</option>
+              <option value="Formation Continue">FC</option>
             </optgroup>
           </select>
         </div>
@@ -274,9 +304,27 @@ export default function Login() {
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
           <div style={{ flex:1 }}>
             <span style={css.label}>Filière</span>
-            <select style={{ ...css.input, background:C.surfaceAlt }} value={filiere} onChange={e => setFiliere(e.target.value)}>
-              <option value="">Choisir...</option>
-              {["LPTML","MPTML","LPSN","MPSN","LPMN","MPMN","CEAM","FOAD","FC"].map(f=><option key={f}>{f}</option>)}
+            <select style={{ ...css.input, background:C.surfaceAlt, marginBottom:8 }}
+              value={filiere} onChange={e => setFiliere(e.target.value)}>
+              <option value="">Choisir une filière...</option>
+              <option value="LPTML-TCA">LPTML-TCA</option>
+              <option value="LPTML-PM">LPTML-PM</option>
+              <option value="LPTML-TM">LPTML-TM</option>
+              <option value="MPTML-GPM">MPTML-GPM</option>
+              <option value="MPTML-LT">MPTML-LT</option>
+              <option value="LPSN">LPSN</option>
+              <option value="CLC">CLC</option>
+              <option value="LPMN">LPMN</option>
+              <option value="OM1">OM1</option>
+              <option value="OM2">OM2</option>
+              <option value="CEAM - CAM POLY">CEAM - CAM POLY</option>
+              <option value="PC 750">PC 750</option>
+              <option value="CDQ">CDQ</option>
+              <option value="ECQD">ECQD</option>
+              <option value="LPGT">LPGT</option>
+              <option value="LPRIT">LPRIT</option>
+              <option value="FOAD">FOAD</option>
+              <option value="Formation Continue">FC</option>
             </select>
           </div>
           <div style={{ flex:1 }}>

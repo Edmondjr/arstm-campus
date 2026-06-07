@@ -14,7 +14,6 @@ import PageAlumni from "./pages/Alumni";
 import PageProfil from "./pages/Profil";
 import PageAide from "./pages/Aide";
 import PageAdmin from "./pages/Admin";
-import PageMessages from "./pages/Messages";
 import PageNotifications from "./pages/Notifications";
 import { useNotifs } from "./hooks/useFirestore";
 import GlobalSearch from "./components/GlobalSearch";
@@ -72,7 +71,6 @@ export default function App() {
   const [drawer, setDrawer]           = useState(false);
   const [winW, setWinW]               = useState(typeof window !== "undefined" ? window.innerWidth : 800);
   const [activeMode, setActiveMode]   = useState(null);
-  const [showMessages, setShowMessages] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [showSearch, setShowSearch]   = useState(false);
@@ -83,7 +81,6 @@ export default function App() {
   const goTo = (id) => {
     setPageState(id);
     setDrawer(false);
-    setShowMessages(false);
   };
 
   useEffect(() => {
@@ -323,32 +320,25 @@ export default function App() {
         </nav>
       )}
 
-      {/* ── FAB MESSAGES ── */}
-      <button
-        onClick={() => setShowMessages(!showMessages)}
-        aria-label={showMessages ? "Fermer les messages" : "Ouvrir les messages"}
+      {/* ── FAB WHATSAPP — contact ARSTM ── */}
+      <a
+        href="https://wa.me/2250000000000"
+        target="_blank" rel="noreferrer"
+        title="Contacter via WhatsApp"
         style={{
           position:"fixed", bottom:isMobile?72:24, right:16, zIndex:800,
-          width:50, height:50, borderRadius:"50%",
-          background: showMessages ? C.mid : GRADIENTS.primary,
+          width:52, height:52, borderRadius:"50%",
+          background:"#25d366",
           color:"#fff", border:"none", cursor:"pointer",
           display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:"1.3rem", boxShadow: showMessages ? SHADOWS.md : SHADOWS.blue,
-          transition:"all 0.22s cubic-bezier(0.22,1,0.36,1)",
-          transform: showMessages ? "scale(0.9) rotate(90deg)" : "scale(1) rotate(0deg)",
+          fontSize:"1.5rem", boxShadow:"0 4px 20px rgba(37,211,102,0.45)",
+          textDecoration:"none", transition:"transform 0.2s",
         }}
+        onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"}
+        onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
       >
-        {showMessages ? "✕" : "💬"}
-      </button>
-
-      {showMessages && (
-        <>
-          <div onClick={() => setShowMessages(false)} style={{position:"fixed",inset:0,zIndex:799,background:"rgba(0,0,0,0.22)"}} className="animate-fade-in"/>
-          <div className="animate-slide-up" style={{position:"fixed",bottom:isMobile?132:84,right:16,zIndex:800,width:isMobile?"calc(100vw - 32px)":390,height:isMobile?"70vh":530,borderRadius:18,overflow:"hidden",boxShadow:SHADOWS["2xl"]}}>
-            <PageMessages profile={profile} onClose={() => setShowMessages(false)} floating={true}/>
-          </div>
-        </>
-      )}
+        💚
+      </a>
 
       {/* ── DRAWER "PLUS" MOBILE ── */}
       {isMobile && drawer && (

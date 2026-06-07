@@ -16,7 +16,17 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   const showTel   = !!user.tel      && priv.showTel === true;
   const showWa    = !!user.whatsapp && priv.showWhatsapp !== false;
   const showEmail = !!user.email    && priv.showEmail === true;
-  const contactCount = 1 + [showTel, showWa].filter(Boolean).length;
+  // Construire les boutons de contact disponibles
+  const waHref  = showWa  ? `https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}` : null;
+  const telHref = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
+  // Bouton principal : WhatsApp si dispo, sinon SMS, sinon Email
+  const primaryHref   = waHref || (telHref ? `sms:${(user.indicatif||"")}${user.tel}` : `mailto:${user.email}`);
+  const primaryLabel  = waHref ? "WhatsApp" : telHref ? "SMS" : "Email";
+  const primaryIcon   = waHref ? "💚" : telHref ? "💬" : "✉️";
+  const primaryBg     = waHref ? "#f0fdf4" : telHref ? C.blueLight : C.surfaceAlt;
+  const primaryColor  = waHref ? "#059669" : telHref ? C.blue : C.mid;
+  const primaryBorder = waHref ? "#bbf7d0" : telHref ? C.blueBorder : C.border;
+
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", paddingBottom:32 }} className="modal-enter">
@@ -51,15 +61,37 @@ export function ProfilExterne({ user, onClose, onMessage }) {
               {user.employeur && <div style={{ fontSize:"0.82rem", color:C.mid, marginTop:2 }}>🏢 {user.employeur}</div>}
             </div>
           )}
-          {/* Actions */}
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${contactCount},1fr)`, gap:8, marginBottom:10 }}>
-            <button onClick={()=>onMessage&&onMessage(user)} style={{ padding:"11px 8px", borderRadius:12, background:`linear-gradient(135deg,${C.blue},${C.aqua})`, color:"#fff", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-              <span style={{ fontSize:"1.1rem" }}>💬</span>Message
-            </button>
-            {showTel && <a href={`tel:${(user.indicatif||"")}${user.tel}`} style={{ padding:"11px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark, border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>📞</span>Appeler</a>}
-            {showWa && <a href={`https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{ padding:"11px 8px", borderRadius:12, background:"#f0fdf4", color:"#059669", border:"1px solid #bbf7d0", textDecoration:"none", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}><span style={{ fontSize:"1.1rem" }}>💚</span>WhatsApp</a>}
+
+          {/* Boutons de contact — pas de chat interne, on redirige vers les apps externes */}
+          <div style={{ display:"grid", gridTemplateColumns: showTel && waHref ? "1fr 1fr" : "1fr", gap:8, marginBottom:10 }}>
+            <a href={primaryHref} target={waHref?"_blank":undefined} rel="noreferrer"
+              style={{ padding:"13px 8px", borderRadius:12, background:primaryBg, color:primaryColor,
+                border:`1px solid ${primaryBorder}`, textDecoration:"none", fontFamily:"inherit",
+                fontWeight:700, fontSize:"0.82rem", display:"flex", flexDirection:"column",
+                alignItems:"center", gap:4, textAlign:"center" }}>
+              <span style={{ fontSize:"1.3rem" }}>{primaryIcon}</span>
+              {primaryLabel}
+            </a>
+            {showTel && waHref && (
+              <a href={telHref}
+                style={{ padding:"13px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark,
+                  border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit",
+                  fontWeight:600, fontSize:"0.82rem", display:"flex", flexDirection:"column",
+                  alignItems:"center", gap:4 }}>
+                <span style={{ fontSize:"1.3rem" }}>📞</span>Appeler
+              </a>
+            )}
           </div>
-          {showEmail && <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>✉️ {user.email}</a>}
+          {showEmail && (
+            <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>
+              ✉️ {user.email}
+            </a>
+          )}
+          {!waHref && !showTel && !showEmail && (
+            <div style={{ textAlign:"center", padding:"10px 12px", background:C.surfaceAlt, borderRadius:10, fontSize:"0.82rem", color:C.muted }}>
+              Aucune information de contact partagée publiquement.
+            </div>
+          )}
         </div>
       </div>
     </div>

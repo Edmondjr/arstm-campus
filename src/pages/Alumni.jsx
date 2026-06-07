@@ -1,11 +1,12 @@
 // src/pages/Alumni.jsx — offres enrichies + candidatures Firestore
 import { useState, useCallback, useEffect } from "react";
 import { C, css, ROLES, SHADOWS } from "../design";
-import { useOffres, addDocument, useCollection } from "../hooks/useFirestore";
+import { useOffres, addDocument, useCollection, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
 import { ProfilExterne } from "./Profil";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, increment, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { db, storage } from "../firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 const getRoleInfo = r => ROLES.find(x=>x.id===r)||{color:C.blue,bg:C.blueLight,icon:"👤",label:r};
 
@@ -152,30 +153,56 @@ function ModalCandidature({ offre, profile, onClose }) {
     filiere: profile?.filiere || "",
     promo:   profile?.promo   || "",
   });
+  const [cvFile,  setCvFile]  = useState(null);
+  const [lmFile,  setLmFile]  = useState(null);
   const [saving,  setSaving]  = useState(false);
+  const [progress, setProgress] = useState(0);
   const [success, setSuccess] = useState(false);
   const [err,     setErr]     = useState("");
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
+  const uploadFile = (file, path) => new Promise((resolve, reject) => {
+    const storageRef = ref(storage, path);
+    const task = uploadBytesResumable(storageRef, file);
+    task.on("state_changed",
+      snap => setProgress(Math.round(snap.bytesTransferred/snap.totalBytes*100)),
+      reject,
+      () => getDownloadURL(task.snapshot.ref).then(resolve).catch(reject)
+    );
+  });
+
   const handleSubmit = async () => {
     if (!form.nom.trim() || !form.email.trim()) { setErr("Nom et email obligatoires."); return; }
+    if (offre.cvReq && !cvFile) { setErr("Le CV est requis pour cette offre."); return; }
+    if (offre.lmReq && !lmFile) { setErr("La lettre de motivation est requise pour cette offre."); return; }
     setSaving(true);
     try {
+      let cvUrl = null, lmUrl = null;
+      const uid = user?.uid || "anon";
+      if (cvFile) cvUrl = await uploadFile(cvFile, `candidatures/${offre.id}/${uid}/cv_${cvFile.name}`);
+      if (lmFile) lmUrl = await uploadFile(lmFile, `candidatures/${offre.id}/${uid}/lm_${lmFile.name}`);
       await addDoc(collection(db, "candidatures"), {
         offreId:    offre.id,
         offreTitre: offre.titre,
         entreprise: offre.ent,
         auteurOffre:offre.auteurUid || null,
-        candidatUid:user?.uid || null,
+        candidatUid:uid,
         ...form,
+        cvUrl, lmUrl,
         createdAt:  serverTimestamp(),
         statut:     "nouveau",
       });
-      // incrémenter compteur (best-effort)
       try {
-        const { updateDoc, doc, increment } = await import("firebase/firestore");
         await updateDoc(doc(db,"offres",offre.id), { candidaturesCount: increment(1) });
       } catch(_) {}
+      if (offre.auteurUid) {
+        await sendNotif(offre.auteurUid, {
+          type:       "candidature",
+          fromName:   form.nom,
+          fromAvatar: profile?.avatar || form.nom.slice(0,2).toUpperCase(),
+          postText:   offre.titre,
+        });
+      }
       setSuccess(true);
     } catch(e) {
       setErr("Erreur lors de l'envoi. Réessayez.");
@@ -211,10 +238,28 @@ function ModalCandidature({ offre, profile, onClose }) {
 
             {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
 
-            {(offre.cvReq || offre.lmReq) && (
-              <div style={{ background:C.blueLight, borderRadius:10, padding:"9px 12px", marginBottom:14, fontSize:"0.8rem", color:C.blue }}>
-                📎 Documents requis : {[offre.cvReq&&"CV",offre.lmReq&&"Lettre de motivation"].filter(Boolean).join(" + ")}
-                {offre.contact && <div style={{ marginTop:4 }}>👉 Envoyez-les à : <strong>{offre.contact}</strong></div>}
+            {offre.cvReq && (
+              <div style={{ marginBottom:10 }}>
+                <label style={css.label}>📎 CV (PDF, DOCX) *</label>
+                <input type="file" accept=".pdf,.doc,.docx" onChange={e=>setCvFile(e.target.files[0]||null)}
+                  style={{ display:"block", width:"100%", padding:"8px", borderRadius:9, border:`1px solid ${C.border}`, background:C.surfaceAlt, fontSize:"0.82rem", cursor:"pointer" }}/>
+                {cvFile && <div style={{ fontSize:"0.74rem", color:C.green, marginTop:3 }}>✓ {cvFile.name}</div>}
+              </div>
+            )}
+            {offre.lmReq && (
+              <div style={{ marginBottom:10 }}>
+                <label style={css.label}>✍️ Lettre de motivation (PDF, DOCX) *</label>
+                <input type="file" accept=".pdf,.doc,.docx" onChange={e=>setLmFile(e.target.files[0]||null)}
+                  style={{ display:"block", width:"100%", padding:"8px", borderRadius:9, border:`1px solid ${C.border}`, background:C.surfaceAlt, fontSize:"0.82rem", cursor:"pointer" }}/>
+                {lmFile && <div style={{ fontSize:"0.74rem", color:C.green, marginTop:3 }}>✓ {lmFile.name}</div>}
+              </div>
+            )}
+            {saving && progress > 0 && progress < 100 && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ height:6, background:C.border, borderRadius:4 }}>
+                  <div style={{ height:"100%", width:`${progress}%`, background:C.blue, borderRadius:4, transition:"width 0.3s" }}/>
+                </div>
+                <div style={{ fontSize:"0.74rem", color:C.muted, marginTop:3 }}>Upload {progress}%…</div>
               </div>
             )}
 
@@ -333,6 +378,7 @@ export default function PageAlumni({ profile, setPage }) {
 
   const canPublish = ["alumni","administration","superadmin"].includes(role);
   const isAdmin    = ["administration","superadmin"].includes(role);
+  const { user } = useAuth();
 
   const alumni = allUsers.filter(u=>u.role==="alumni"&&u.status==="approved");
 
@@ -374,7 +420,7 @@ export default function PageAlumni({ profile, setPage }) {
 
       {/* Onglets */}
       <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
-        {[["offres","💼 Offres"],["annuaire","🎓 Annuaire"],["conseils","💡 Conseils"]].map(([v,l])=>(
+        {[["offres","💼 Offres"],["annuaire","🎓 Annuaire"],["conseils","💡 Conseils"],...( canPublish ? [["candidatures","📥 Candidatures"]] : [])].map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)} style={{
             padding:"7px 18px",borderRadius:20,
             border:`1px solid ${tab===v?C.blue:C.border}`,
@@ -500,6 +546,86 @@ export default function PageAlumni({ profile, setPage }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── CANDIDATURES REÇUES ── */}
+      {tab==="candidatures" && canPublish && (
+        <CandidaturesRecues uid={user?.uid} offres={offres} />
+      )}
+    </div>
+  );
+}
+
+function CandidaturesRecues({ uid, offres }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOffre, setSelectedOffre] = useState("tous");
+
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(db,"candidatures"), where("auteurOffre","==",uid));
+    const unsub = onSnapshot(q, snap => {
+      setItems(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
+      setLoading(false);
+    }, ()=>setLoading(false));
+    return unsub;
+  }, [uid]);
+
+  const myOffres = offres.filter(o=>o.auteurUid===uid);
+  const filtered = selectedOffre==="tous" ? items : items.filter(c=>c.offreId===selectedOffre);
+
+  if (loading) return <div style={{padding:40,textAlign:"center",color:C.muted}}>Chargement…</div>;
+
+  return (
+    <div>
+      <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <select style={{...css.input,maxWidth:280}} value={selectedOffre} onChange={e=>setSelectedOffre(e.target.value)}>
+          <option value="tous">Toutes mes offres ({items.length})</option>
+          {myOffres.map(o=>(
+            <option key={o.id} value={o.id}>{o.titre} · {o.ent}</option>
+          ))}
+        </select>
+      </div>
+      {filtered.length===0 ? (
+        <div style={{...css.card,textAlign:"center",padding:48,color:C.muted}}>
+          <div style={{fontSize:"2.5rem",marginBottom:12}}>📥</div>
+          <div style={{fontWeight:600,color:C.navy,marginBottom:6}}>Aucune candidature reçue</div>
+          <div style={{fontSize:"0.84rem"}}>Les candidatures apparaîtront ici lorsque des membres postuleront à vos offres.</div>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {filtered.map(c=>(
+            <div key={c.id} style={{...css.card}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                <div>
+                  <div style={{fontWeight:700,color:C.navy,fontSize:"0.92rem"}}>{c.nom}</div>
+                  <div style={{fontSize:"0.77rem",color:C.muted,marginTop:2}}>{c.filiere}{c.promo?" · "+c.promo:""}</div>
+                </div>
+                <span style={{...css.badge(C.blueLight,C.blue),alignSelf:"flex-start",fontSize:"0.72rem"}}>
+                  {c.offreTitre}
+                </span>
+              </div>
+              <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:"0.8rem",color:C.mid,marginBottom:c.message?8:0}}>
+                {c.email && <a href={`mailto:${c.email}`} style={{color:C.blue,textDecoration:"none"}}>✉️ {c.email}</a>}
+                {c.tel   && <a href={`tel:${c.tel}`}    style={{color:C.blue,textDecoration:"none"}}>📞 {c.tel}</a>}
+              </div>
+              {c.message && (
+                <div style={{background:C.surfaceAlt,borderRadius:9,padding:"9px 12px",fontSize:"0.83rem",color:C.dark,lineHeight:1.65}}>
+                  {c.message}
+                </div>
+              )}
+              {(c.cvUrl||c.lmUrl) && (
+                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                  {c.cvUrl && <a href={c.cvUrl} target="_blank" rel="noreferrer" style={{...css.btnSm,textDecoration:"none",background:C.greenLight,color:C.green,border:`1px solid ${C.green}30`}}>📎 CV</a>}
+                  {c.lmUrl && <a href={c.lmUrl} target="_blank" rel="noreferrer" style={{...css.btnSm,textDecoration:"none",background:C.blueLight,color:C.blue,border:`1px solid ${C.blueBorder}`}}>✍️ Lettre</a>}
+                </div>
+              )}
+              <div style={{fontSize:"0.72rem",color:C.muted,marginTop:8}}>
+                {c.createdAt?.toDate?.()?.toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})||""}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

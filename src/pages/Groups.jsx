@@ -116,8 +116,9 @@ export default function PageGroups({ profile }) {
   const { data: groups, loading } = useGroups();
   const [activeGroup, setActiveGroup] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ name:"", description:"", icon:"💬", color:"#2563eb" });
+  const [createForm, setCreateForm] = useState({ name:"", description:"", icon:"💬", color:"#2563eb", whatsappLink:"" });
   const [creating, setCreating] = useState(false);
+  const [createdGroup, setCreatedGroup] = useState(null);
   const [filter, setFilter] = useState("tous"); // "tous" | "mes"
 
   const mesGroupes = groups.filter(g => g.members?.includes(uid));
@@ -127,16 +128,18 @@ export default function PageGroups({ profile }) {
     if (!createForm.name.trim()) return;
     setCreating(true);
     await createGroup({
-      name:        createForm.name.trim(),
-      description: createForm.description.trim(),
-      icon:        createForm.icon,
-      color:       createForm.color,
-      members:     [uid],
-      admins:      [uid],
-      createdBy:   uid,
-      lastMessage: "",
+      name:         createForm.name.trim(),
+      description:  createForm.description.trim(),
+      icon:         createForm.icon,
+      color:        createForm.color,
+      whatsappLink: createForm.whatsappLink.trim() || null,
+      members:      [uid],
+      admins:       [uid],
+      createdBy:    uid,
+      lastMessage:  "",
     });
-    setCreateForm({ name:"", description:"", icon:"💬", color:"#2563eb" });
+    setCreatedGroup(createForm.name.trim());
+    setCreateForm({ name:"", description:"", icon:"💬", color:"#2563eb", whatsappLink:"" });
     setShowCreate(false); setCreating(false);
   };
 
@@ -204,9 +207,34 @@ export default function PageGroups({ profile }) {
               </div>
             </div>
           </div>
+          <div style={{ marginBottom:14 }}>
+            <span style={css.label}>Lien WhatsApp (optionnel)</span>
+            <input style={css.input} placeholder="https://chat.whatsapp.com/…"
+              value={createForm.whatsappLink} onChange={e => setCreateForm({...createForm, whatsappLink:e.target.value})}/>
+            <div style={{ fontSize:"0.73rem", color:C.muted, marginTop:3 }}>Collez un lien d'invitation WhatsApp pour connecter ce groupe</div>
+          </div>
           <button style={{ ...css.btnPrimary, opacity:creating?0.7:1 }} onClick={handleCreate} disabled={creating}>
             {creating ? "⏳ Création…" : "✅ Créer le groupe"}
           </button>
+        </div>
+      )}
+
+      {/* Bannière post-création — partager sur WhatsApp */}
+      {createdGroup && (
+        <div style={{ ...css.card, marginBottom:16, background:"#f0fdf4", border:"1px solid #bbf7d0", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:700, color:"#059669", fontSize:"0.88rem" }}>✅ Groupe « {createdGroup} » créé !</div>
+            <div style={{ fontSize:"0.78rem", color:C.muted, marginTop:2 }}>Invitez des membres en partageant sur WhatsApp.</div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Rejoignez le groupe "${createdGroup}" sur ARSTM Campus !`)}`}
+              target="_blank" rel="noreferrer"
+              style={{ padding:"8px 14px", borderRadius:20, background:"#25D366", color:"#fff", fontWeight:700, fontSize:"0.8rem", textDecoration:"none", display:"flex", alignItems:"center", gap:6 }}>
+              <svg width="16" height="16" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="white" fillOpacity="0.2"/><path d="M23.5 8.5C21.7 6.7 19.4 5.7 16.9 5.7C11.7 5.7 7.5 9.9 7.5 15.1C7.5 16.8 8 18.4 8.8 19.8L7.4 24.3L12 22.9C13.4 23.7 14.9 24.1 16.5 24.1H16.9C22.1 24.1 26.3 19.9 26.3 14.7C26.3 12.2 25.3 9.9 23.5 8.5Z" fill="white"/></svg>
+              Partager
+            </a>
+            <button onClick={() => setCreatedGroup(null)} style={{ padding:"8px 12px", borderRadius:20, background:"transparent", border:"1px solid #bbf7d0", color:"#059669", fontSize:"0.8rem", cursor:"pointer", fontFamily:"inherit" }}>✕</button>
+          </div>
         </div>
       )}
 
@@ -242,7 +270,7 @@ export default function PageGroups({ profile }) {
                   {g.lastMessage && <span style={{ fontSize:"0.73rem", color:C.muted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:160 }}>· {g.lastMessage}</span>}
                 </div>
               </div>
-              <div style={{ flexShrink:0 }}>
+              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end" }}>
                 {isMember ? (
                   <div style={{ display:"flex", gap:6 }}>
                     <span style={{ ...css.badge(C.greenLight, C.green), fontSize:"0.7rem" }}>✓ Membre</span>
@@ -254,6 +282,13 @@ export default function PageGroups({ profile }) {
                     onClick={e => handleJoin(g, e)}>
                     + Rejoindre
                   </button>
+                )}
+                {g.whatsappLink && (
+                  <a href={g.whatsappLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                    style={{ fontSize:"0.72rem", color:"#059669", textDecoration:"none", display:"flex", alignItems:"center", gap:4, padding:"4px 8px", borderRadius:10, background:"#f0fdf4", border:"1px solid #bbf7d0" }}>
+                    <svg width="12" height="12" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#25D366"/><path d="M23.5 8.5C21.7 6.7 19.4 5.7 16.9 5.7C11.7 5.7 7.5 9.9 7.5 15.1C7.5 16.8 8 18.4 8.8 19.8L7.4 24.3L12 22.9C13.4 23.7 14.9 24.1 16.5 24.1H16.9C22.1 24.1 26.3 19.9 26.3 14.7C26.3 12.2 25.3 9.9 23.5 8.5Z" fill="white"/></svg>
+                    Groupe WA
+                  </a>
                 )}
               </div>
             </div>

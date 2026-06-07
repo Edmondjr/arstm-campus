@@ -320,25 +320,24 @@ export default function App() {
         </nav>
       )}
 
-      {/* ── FAB WHATSAPP — contact ARSTM ── */}
-      <a
-        href="https://wa.me/2250000000000"
-        target="_blank" rel="noreferrer"
-        title="Contacter via WhatsApp"
+      {/* ── FAB — recherche utilisateur ── */}
+      <button
+        onClick={() => setShowSearch(true)}
+        title="Rechercher un membre"
         style={{
           position:"fixed", bottom:isMobile?72:24, right:16, zIndex:800,
           width:52, height:52, borderRadius:"50%",
-          background:"#25d366",
+          background: "linear-gradient(135deg,#2563eb,#0891b2)",
           color:"#fff", border:"none", cursor:"pointer",
           display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:"1.5rem", boxShadow:"0 4px 20px rgba(37,211,102,0.45)",
-          textDecoration:"none", transition:"transform 0.2s",
+          fontSize:"1.4rem", boxShadow:"0 4px 20px rgba(37,99,235,0.4)",
+          transition:"transform 0.2s",
         }}
         onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"}
         onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
       >
-        💚
-      </a>
+        💬
+      </button>
 
       {/* ── DRAWER "PLUS" MOBILE ── */}
       {isMobile && drawer && (
@@ -389,7 +388,7 @@ export default function App() {
         <ProfilExterne
           user={searchUser}
           onClose={() => setSearchUser(null)}
-          onMessage={() => { setSearchUser(null); setShowMessages(true); }}
+          onMessage={() => setSearchUser(null)}
         />
       )}
 

@@ -11,21 +11,23 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   if (!user) return null;
   const roleInfo = ROLES.find(r => r.id === user.role) || ROLES[0];
   const initials  = user.avatar || user.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() || "?";
-  // Privacy flags — default: WhatsApp visible, tel/email hidden (unless explicitly enabled)
+  // Privacy flags — opt-out model: visible by default unless user explicitly disabled
   const priv      = user.privacy || {};
-  const showTel   = !!user.tel      && priv.showTel === true;
   const showWa    = !!user.whatsapp && priv.showWhatsapp !== false;
-  const showEmail = !!user.email    && priv.showEmail === true;
-  // Construire les boutons de contact disponibles
-  const waHref  = showWa  ? `https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}` : null;
-  const telHref = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
-  // Bouton principal : WhatsApp si dispo, sinon SMS, sinon Email
-  const primaryHref   = waHref || (telHref ? `sms:${(user.indicatif||"")}${user.tel}` : `mailto:${user.email}`);
-  const primaryLabel  = waHref ? "WhatsApp" : telHref ? "SMS" : "Email";
-  const primaryIcon   = waHref ? "💚" : telHref ? "💬" : "✉️";
-  const primaryBg     = waHref ? "#f0fdf4" : telHref ? C.blueLight : C.surfaceAlt;
-  const primaryColor  = waHref ? "#059669" : telHref ? C.blue : C.mid;
-  const primaryBorder = waHref ? "#bbf7d0" : telHref ? C.blueBorder : C.border;
+  const showTel   = !!user.tel      && priv.showTel      !== false;
+  const showEmail = !!user.email    && priv.showEmail     !== false;
+
+  const waNumber = ((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"");
+  const waHref   = showWa  ? `https://wa.me/${waNumber}` : null;
+  const telHref  = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
+  const smsHref  = showTel ? `sms:${(user.indicatif||"")}${user.tel}` : null;
+
+  const WaLogo = () => (
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="16" fill="#25D366"/>
+      <path d="M23.5 8.5C21.7 6.7 19.4 5.7 16.9 5.7C11.7 5.7 7.5 9.9 7.5 15.1C7.5 16.8 8 18.4 8.8 19.8L7.4 24.3L12 22.9C13.4 23.7 14.9 24.1 16.5 24.1H16.9C22.1 24.1 26.3 19.9 26.3 14.7C26.3 12.2 25.3 9.9 23.5 8.5ZM16.9 22.5C15.5 22.5 14.1 22.1 12.9 21.4L12.6 21.2L9.6 22.1L10.5 19.2L10.3 18.9C9.5 17.6 9.1 16.2 9.1 14.7C9.1 10.5 12.5 7.1 16.7 7.1C18.7 7.1 20.6 7.9 22 9.3C23.4 10.7 24.1 12.6 24.1 14.6C24.5 18.9 21.1 22.5 16.9 22.5ZM21.1 17.1C20.9 17 19.7 16.4 19.5 16.3C19.3 16.2 19.2 16.2 19 16.4C18.8 16.6 18.4 17.2 18.2 17.4C18.1 17.5 18 17.5 17.8 17.5C17.6 17.4 17 17.2 16.2 16.5C15.6 16 15.2 15.2 15.1 15C15 14.8 15.1 14.7 15.2 14.6C15.3 14.5 15.4 14.3 15.5 14.2C15.6 14.1 15.6 14 15.7 13.8C15.8 13.6 15.7 13.5 15.7 13.4C15.7 13.3 15.1 12.1 14.9 11.6C14.7 11.1 14.5 11.2 14.4 11.2C14.3 11.2 14.1 11.2 13.9 11.2C13.7 11.2 13.5 11.3 13.3 11.5C13.1 11.7 12.5 12.3 12.5 13.5C12.5 14.7 13.3 15.8 13.4 16C13.5 16.2 15.1 18.7 17.6 19.7C18.2 19.9 18.7 20.1 19.1 20.2C19.7 20.4 20.3 20.4 20.7 20.3C21.2 20.2 22.1 19.7 22.3 19.1C22.5 18.5 22.5 18 22.4 17.9C22.3 17.8 22.1 17.7 21.9 17.6L21.1 17.1Z" fill="white"/>
+    </svg>
+  );
 
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
@@ -62,36 +64,50 @@ export function ProfilExterne({ user, onClose, onMessage }) {
             </div>
           )}
 
-          {/* Boutons de contact — pas de chat interne, on redirige vers les apps externes */}
-          <div style={{ display:"grid", gridTemplateColumns: showTel && waHref ? "1fr 1fr" : "1fr", gap:8, marginBottom:10 }}>
-            <a href={primaryHref} target={waHref?"_blank":undefined} rel="noreferrer"
-              style={{ padding:"13px 8px", borderRadius:12, background:primaryBg, color:primaryColor,
-                border:`1px solid ${primaryBorder}`, textDecoration:"none", fontFamily:"inherit",
-                fontWeight:700, fontSize:"0.82rem", display:"flex", flexDirection:"column",
-                alignItems:"center", gap:4, textAlign:"center" }}>
-              <span style={{ fontSize:"1.3rem" }}>{primaryIcon}</span>
-              {primaryLabel}
-            </a>
-            {showTel && waHref && (
-              <a href={telHref}
-                style={{ padding:"13px 8px", borderRadius:12, background:C.surfaceAlt, color:C.dark,
-                  border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit",
-                  fontWeight:600, fontSize:"0.82rem", display:"flex", flexDirection:"column",
-                  alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:"1.3rem" }}>📞</span>Appeler
+          {/* Boutons de contact — tout affiché par défaut, redirige vers apps externes */}
+          <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
+            {waHref && (
+              <a href={waHref} target="_blank" rel="noreferrer"
+                style={{ padding:"12px 16px", borderRadius:12, background:"#f0fdf4", color:"#059669",
+                  border:"1px solid #bbf7d0", textDecoration:"none", fontFamily:"inherit",
+                  fontWeight:700, fontSize:"0.85rem", display:"flex", alignItems:"center", gap:10 }}>
+                <WaLogo/>
+                WhatsApp · {(user.waIndicatif||user.indicatif||"")} {user.whatsapp}
               </a>
             )}
+            {telHref && (
+              <a href={telHref}
+                style={{ padding:"12px 16px", borderRadius:12, background:C.blueLight, color:C.blue,
+                  border:`1px solid ${C.blueBorder}`, textDecoration:"none", fontFamily:"inherit",
+                  fontWeight:600, fontSize:"0.85rem", display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:"1.2rem" }}>📞</span>
+                Appeler · {(user.indicatif||"")} {user.tel}
+              </a>
+            )}
+            {smsHref && (
+              <a href={smsHref}
+                style={{ padding:"12px 16px", borderRadius:12, background:C.surfaceAlt, color:C.dark,
+                  border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit",
+                  fontWeight:600, fontSize:"0.85rem", display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:"1.2rem" }}>💬</span>
+                SMS · {(user.indicatif||"")} {user.tel}
+              </a>
+            )}
+            {showEmail && (
+              <a href={`mailto:${user.email}`}
+                style={{ padding:"12px 16px", borderRadius:12, background:C.surfaceAlt, color:C.dark,
+                  border:`1px solid ${C.border}`, textDecoration:"none", fontFamily:"inherit",
+                  fontWeight:600, fontSize:"0.85rem", display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:"1.2rem" }}>✉️</span>
+                {user.email}
+              </a>
+            )}
+            {!waHref && !telHref && !showEmail && (
+              <div style={{ textAlign:"center", padding:"10px 12px", background:C.surfaceAlt, borderRadius:10, fontSize:"0.82rem", color:C.muted }}>
+                Aucune information de contact partagée publiquement.
+              </div>
+            )}
           </div>
-          {showEmail && (
-            <a href={`mailto:${user.email}`} style={{ ...css.btnSecondary, display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", textDecoration:"none", fontSize:"0.83rem", borderRadius:10 }}>
-              ✉️ {user.email}
-            </a>
-          )}
-          {!waHref && !showTel && !showEmail && (
-            <div style={{ textAlign:"center", padding:"10px 12px", background:C.surfaceAlt, borderRadius:10, fontSize:"0.82rem", color:C.muted }}>
-              Aucune information de contact partagée publiquement.
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -377,9 +393,9 @@ export default function PageProfil({ profile, onLogout, setPage }) {
           {/* Confidentialité — persisté dans Firestore */}
           <Card title="Confidentialité">
             {[
-              ["showTel","Afficher mon téléphone","Bouton « Appeler » sur mon profil public",false],
+              ["showTel","Afficher mon téléphone","Bouton « Appeler » sur mon profil public",true],
               ["showWhatsapp","Afficher mon WhatsApp","Les autres peuvent me contacter",true],
-              ["showEmail","Afficher mon email","Bouton « Email » sur mon profil public",false],
+              ["showEmail","Afficher mon email","Bouton « Email » sur mon profil public",true],
               ["visibleAlumni","Profil visible aux Alumni","Networking et opportunités",true],
             ].map(([key,l,d,def])=>(
               <PrivacyToggle key={key} pkey={key} label={l} desc={d}

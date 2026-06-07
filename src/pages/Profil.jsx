@@ -146,7 +146,7 @@ export default function PageProfil({ profile, onLogout, setPage }) {
 
   const handlePhotoUpload = async(e)=>{
     const file=e.target.files[0]; if(!file) return;
-    if(file.size>500000){alert("Max 500 Ko"); return;}
+    if(file.size>3000000){alert("Max 3 Mo"); return;}
     setUploading(true);
     const reader=new FileReader();
     reader.onload=async(ev)=>{

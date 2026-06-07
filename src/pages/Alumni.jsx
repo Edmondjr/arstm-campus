@@ -1,12 +1,11 @@
 // src/pages/Alumni.jsx — offres enrichies + candidatures Firestore
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { C, css, ROLES, SHADOWS } from "../design";
 import { useOffres, addDocument, useCollection, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
 import { ProfilExterne } from "./Profil";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, increment } from "firebase/firestore";
-import { db, storage } from "../firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, increment } from "firebase/firestore";
+import { db } from "../firebase";
 
 const getRoleInfo = r => ROLES.find(x=>x.id===r)||{color:C.blue,bg:C.blueLight,icon:"👤",label:r};
 
@@ -17,35 +16,51 @@ const TYPE_COLORS = {
   "Freelance": { bg:"#faf5ff",    color:"#7c3aed" },
 };
 
+const CODES = ["+225","+223","+226","+228","+229","+221","+237","+243","+33","+1","+44"];
+
 // ── Formulaire publication d'offre ─────────────────────────────────────────
 function FormulaireOffre({ profile, onClose, onDone }) {
   const { user } = useAuth();
   const [form, setForm] = useState({
     titre:"", ent:"", type:"Stage", lieu:"Abidjan, Côte d'Ivoire",
     secteur:"", deadline:"", salaire:"", niveauReq:"",
-    desc:"", missions:"", profil:"", contact:"",
+    desc:"", missions:"", profil:"",
     cvReq:true, lmReq:false,
   });
+
+  // Contact methods
+  const [contactBy,      setContactBy]      = useState({ email:true, whatsapp:false, linkedin:false });
+  const [emailRecruteur, setEmailRecruteur] = useState(profile?.email || "");
+  const [waIndicatif,    setWaIndicatif]    = useState(profile?.waIndicatif||profile?.indicatif||"+225");
+  const [waRecruteur,    setWaRecruteur]    = useState("");
+  const [linkedinUrl,    setLinkedinUrl]    = useState("");
+
   const [saving, setSaving] = useState(false);
   const [err, setErr]       = useState("");
-  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const set = (k,v)         => setForm(f=>({...f,[k]:v}));
+  const toggleContact = key => setContactBy(p=>({...p,[key]:!p[key]}));
 
   const handleSubmit = async () => {
     if (!form.titre.trim() || !form.ent.trim()) { setErr("Le titre et l'entreprise sont obligatoires."); return; }
+    if (!contactBy.email && !contactBy.whatsapp && !contactBy.linkedin) { setErr("Choisissez au moins un mode de candidature."); return; }
+    if (contactBy.email && !emailRecruteur.trim()) { setErr("L'email du recruteur est obligatoire."); return; }
     setSaving(true);
     await addDocument("offres", {
       ...form,
-      alumni:    profile.name,
-      auteurUid: user?.uid || profile.uid,
-      tags:      [form.secteur, form.type].filter(Boolean),
+      alumni:           profile.name,
+      auteurUid:        user?.uid || profile.uid,
+      emailPublicateur: profile.email || user?.email || "",
+      emailRecruteur:   contactBy.email    ? emailRecruteur.trim()                                   : "",
+      waRecruteur:      contactBy.whatsapp ? (waIndicatif + waRecruteur).replace(/\s/g,"")           : "",
+      linkedinUrl:      contactBy.linkedin ? linkedinUrl.trim()                                      : "",
+      contactBy,
+      tags:             [form.secteur, form.type].filter(Boolean),
       candidaturesCount: 0,
     });
     setSaving(false);
     onDone?.();
     onClose?.();
   };
-
-  const lbl = (t) => <span style={css.label}>{t}</span>;
 
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.55)",
@@ -60,7 +75,6 @@ function FormulaireOffre({ profile, onClose, onDone }) {
 
         {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:14, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
 
-        {/* Ligne 1 */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:10, marginBottom:12 }}>
           <div><label style={css.label}>Titre du poste *</label>
             <input style={css.input} placeholder="Ex: Stage Opérations Transit" value={form.titre} onChange={e=>set("titre",e.target.value)}/></div>
@@ -70,7 +84,6 @@ function FormulaireOffre({ profile, onClose, onDone }) {
             </select></div>
         </div>
 
-        {/* Ligne 2 */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
           <div><label style={css.label}>Entreprise *</label>
             <input style={css.input} placeholder="Nom de l'entreprise" value={form.ent} onChange={e=>set("ent",e.target.value)}/></div>
@@ -78,7 +91,6 @@ function FormulaireOffre({ profile, onClose, onDone }) {
             <input style={css.input} placeholder="Abidjan, CI" value={form.lieu} onChange={e=>set("lieu",e.target.value)}/></div>
         </div>
 
-        {/* Ligne 3 */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
           <div><label style={css.label}>Secteur / Filière</label>
             <input style={css.input} placeholder="Ex: Transit, Maritime…" value={form.secteur} onChange={e=>set("secteur",e.target.value)}/></div>
@@ -89,39 +101,94 @@ function FormulaireOffre({ profile, onClose, onDone }) {
             </select></div>
         </div>
 
-        {/* Ligne 4 */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
           <div><label style={css.label}>Date limite (optionnel)</label>
-            <input style={{...css.input}} type="date" value={form.deadline} onChange={e=>set("deadline",e.target.value)}/></div>
+            <input style={css.input} type="date" value={form.deadline} onChange={e=>set("deadline",e.target.value)}/></div>
           <div><label style={css.label}>Rémunération</label>
             <input style={css.input} placeholder="Ex: 80 000 FCFA / mois" value={form.salaire} onChange={e=>set("salaire",e.target.value)}/></div>
         </div>
 
-        {/* Description */}
         <div style={{ marginBottom:12 }}>
           <label style={css.label}>Description du poste</label>
           <textarea style={{...css.input,resize:"none",minHeight:70}} placeholder="Présentation du poste et de l'entreprise…" value={form.desc} onChange={e=>set("desc",e.target.value)}/>
         </div>
-
-        {/* Missions */}
         <div style={{ marginBottom:12 }}>
           <label style={css.label}>Missions principales</label>
           <textarea style={{...css.input,resize:"none",minHeight:60}} placeholder="• Mission 1&#10;• Mission 2…" value={form.missions} onChange={e=>set("missions",e.target.value)}/>
         </div>
-
-        {/* Profil recherché */}
-        <div style={{ marginBottom:12 }}>
+        <div style={{ marginBottom:14 }}>
           <label style={css.label}>Profil recherché</label>
           <textarea style={{...css.input,resize:"none",minHeight:60}} placeholder="Compétences, qualités attendues…" value={form.profil} onChange={e=>set("profil",e.target.value)}/>
         </div>
 
-        {/* Contact */}
-        <div style={{ marginBottom:14 }}>
-          <label style={css.label}>Email ou WhatsApp pour postuler</label>
-          <input style={css.input} placeholder="recrutement@entreprise.ci ou +225…" value={form.contact} onChange={e=>set("contact",e.target.value)}/>
+        {/* ── Section "Comment postuler" ── */}
+        <div style={{ background:C.surfaceAlt, borderRadius:14, padding:"16px", marginBottom:16, border:`1px solid ${C.border}` }}>
+          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.88rem", color:C.navy, marginBottom:14 }}>
+            📬 Comment postuler ?
+          </div>
+
+          {/* Email */}
+          <div style={{ marginBottom:12 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:8 }}>
+              <input type="checkbox" checked={contactBy.email} onChange={()=>toggleContact("email")} style={{width:16,height:16,cursor:"pointer"}}/>
+              <span style={{ fontWeight:600, fontSize:"0.85rem", color:C.dark }}>✉️ Par Email</span>
+            </label>
+            {contactBy.email && (
+              <div>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={css.label}>Email du recruteur *</span>
+                  <button type="button" onClick={()=>setEmailRecruteur(profile?.email||"")}
+                    style={{...css.btnGhost, padding:"2px 8px", fontSize:"0.74rem", color:C.blue}}>
+                    = Mon email
+                  </button>
+                </div>
+                <input style={{...css.input,background:"#fff"}} type="email" placeholder="recruteur@entreprise.ci"
+                  value={emailRecruteur} onChange={e=>setEmailRecruteur(e.target.value)}/>
+              </div>
+            )}
+          </div>
+
+          {/* WhatsApp */}
+          <div style={{ marginBottom:12 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:8 }}>
+              <input type="checkbox" checked={contactBy.whatsapp} onChange={()=>toggleContact("whatsapp")} style={{width:16,height:16,cursor:"pointer"}}/>
+              <span style={{ fontWeight:600, fontSize:"0.85rem", color:C.dark }}>📱 Par WhatsApp</span>
+            </label>
+            {contactBy.whatsapp && (
+              <div>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={css.label}>Numéro WhatsApp du recruteur</span>
+                  <button type="button" onClick={()=>{ setWaIndicatif(profile?.waIndicatif||profile?.indicatif||"+225"); setWaRecruteur(profile?.whatsapp||profile?.tel||""); }}
+                    style={{...css.btnGhost, padding:"2px 8px", fontSize:"0.74rem", color:C.blue}}>
+                    = Mon WA
+                  </button>
+                </div>
+                <div style={{ display:"flex", gap:6 }}>
+                  <select style={{...css.input, background:"#fff", width:80, padding:"8px 4px", fontSize:"0.82rem", flexShrink:0}}
+                    value={waIndicatif} onChange={e=>setWaIndicatif(e.target.value)}>
+                    {CODES.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                  <input style={{...css.input, background:"#fff", flex:1}} placeholder="07 00 00 00"
+                    value={waRecruteur} onChange={e=>setWaRecruteur(e.target.value)}/>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* LinkedIn */}
+          <div>
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:8 }}>
+              <input type="checkbox" checked={contactBy.linkedin} onChange={()=>toggleContact("linkedin")} style={{width:16,height:16,cursor:"pointer"}}/>
+              <span style={{ fontWeight:600, fontSize:"0.85rem", color:C.dark }}>💼 Via LinkedIn</span>
+            </label>
+            {contactBy.linkedin && (
+              <input style={{...css.input,background:"#fff"}} placeholder="https://linkedin.com/in/… ou linkedin.com/jobs/view/…"
+                value={linkedinUrl} onChange={e=>setLinkedinUrl(e.target.value)}/>
+            )}
+          </div>
         </div>
 
-        {/* Checkboxes docs */}
+        {/* Documents requis */}
         <div style={{ display:"flex", gap:16, marginBottom:18, flexWrap:"wrap" }}>
           <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:"0.85rem", color:C.dark }}>
             <input type="checkbox" checked={form.cvReq} onChange={e=>set("cvReq",e.target.checked)} style={{ width:16, height:16 }}/>
@@ -142,9 +209,10 @@ function FormulaireOffre({ profile, onClose, onDone }) {
   );
 }
 
-// ── Modal candidature ───────────────────────────────────────────────────────
+// ── Modal candidature (2 étapes : formulaire → contact) ─────────────────────
 function ModalCandidature({ offre, profile, onClose }) {
   const { user } = useAuth();
+  const [step, setStep] = useState("form"); // "form" | "contact"
   const [form, setForm] = useState({
     nom:     profile?.name    || "",
     email:   profile?.email   || "",
@@ -153,42 +221,14 @@ function ModalCandidature({ offre, profile, onClose }) {
     filiere: profile?.filiere || "",
     promo:   profile?.promo   || "",
   });
-  const [cvFile,    setCvFile]    = useState(null);
-  const [lmFile,    setLmFile]    = useState(null);
-  const [saving,    setSaving]    = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [success,   setSuccess]   = useState(false);
-  const [err,       setErr]       = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err,    setErr]    = useState("");
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
-
-  const pickFile = (setter) => (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { setErr("Fichier trop grand (max 5 Mo)."); return; }
-    setter(f);
-    setErr("");
-  };
 
   const handleSubmit = async () => {
     if (!form.nom.trim() || !form.email.trim()) { setErr("Nom et email obligatoires."); return; }
-    if (offre.cvReq && !cvFile) { setErr("Le CV est requis pour cette offre."); return; }
-    if (offre.lmReq && !lmFile) { setErr("La lettre de motivation est requise pour cette offre."); return; }
     setSaving(true);
     try {
-      let cvUrl = null, lmUrl = null;
-      if (cvFile || lmFile) setUploading(true);
-      if (cvFile) {
-        const r = ref(storage, `candidatures/${offre.id}/${user?.uid||"anon"}/cv_${Date.now()}_${cvFile.name}`);
-        await uploadBytes(r, cvFile);
-        cvUrl = await getDownloadURL(r);
-      }
-      if (lmFile) {
-        const r = ref(storage, `candidatures/${offre.id}/${user?.uid||"anon"}/lm_${Date.now()}_${lmFile.name}`);
-        await uploadBytes(r, lmFile);
-        lmUrl = await getDownloadURL(r);
-      }
-      setUploading(false);
-
       await addDoc(collection(db, "candidatures"), {
         offreId:     offre.id,
         offreTitre:  offre.titre,
@@ -196,16 +236,10 @@ function ModalCandidature({ offre, profile, onClose }) {
         auteurOffre: offre.auteurUid || null,
         candidatUid: user?.uid || null,
         ...form,
-        cvUrl,
-        lmUrl,
         createdAt: serverTimestamp(),
         statut:    "nouveau",
       });
-
-      // incrémenter compteur (best-effort)
       try { await updateDoc(doc(db,"offres",offre.id), { candidaturesCount: increment(1) }); } catch(_) {}
-
-      // notifier le publieur de l'offre
       if (offre.auteurUid) {
         await sendNotif(offre.auteurUid, {
           type:        "candidature",
@@ -213,35 +247,52 @@ function ModalCandidature({ offre, profile, onClose }) {
           message:     `${form.nom} a postulé à « ${offre.titre} »`,
           offreId:     offre.id,
           candidatNom: form.nom,
+          candidatEmail: form.email,
+          candidatTel:   form.tel,
         });
       }
-
-      setSuccess(true);
+      setStep("contact");
     } catch(e) {
-      setUploading(false);
       setErr("Erreur lors de l'envoi. Réessayez.");
     }
     setSaving(false);
   };
 
-  const FileInput = ({ label, file, setter, required }) => (
-    <div style={{ marginBottom:10 }}>
-      <label style={css.label}>
-        {label} {required && <span style={{ color:C.red }}>*</span>}
-        {!required && <span style={{ color:C.muted, fontWeight:400 }}> (optionnel)</span>}
-      </label>
-      <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer",
-        padding:"10px 12px", background:file?"#f0fdf4":C.surfaceAlt,
-        borderRadius:10, border:`1px solid ${file?"#bbf7d0":C.border}`, transition:"all 0.15s" }}>
-        <span style={{ fontSize:"1.1rem" }}>{file ? "✅" : "📎"}</span>
-        <span style={{ fontSize:"0.83rem", color:file?"#059669":C.muted, flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-          {file ? file.name : "PDF, DOC, DOCX — max 5 Mo"}
-        </span>
-        {file && <button type="button" onClick={e=>{e.preventDefault();setter(null);}} style={{ border:"none",background:"none",cursor:"pointer",color:C.muted,fontSize:"0.8rem",padding:0 }}>✕</button>}
-        <input type="file" accept=".pdf,.doc,.docx,.odt" style={{ display:"none" }} onChange={pickFile(setter)}/>
-      </label>
-    </div>
+  // ── Construction des liens de contact ─────────────────────────────────────
+  const sujet = encodeURIComponent(`Candidature – ${offre.titre} – ${form.nom}`);
+  const corps = encodeURIComponent(
+    `Bonjour Madame/Monsieur,\n\n` +
+    `Suite à la publication de votre offre de ${offre.type||"poste"} intitulée « ${offre.titre} » au sein de ${offre.ent}, ` +
+    `je me permets de vous adresser ma candidature.\n\n` +
+    `Nom : ${form.nom}\n` +
+    `Filière : ${form.filiere||"–"}\n` +
+    `Promotion : ${form.promo||"–"}\n` +
+    `Téléphone : ${form.tel||"–"}\n\n` +
+    `${form.message ? form.message + "\n\n" : ""}` +
+    `Je reste disponible pour tout entretien à votre convenance.\n\n` +
+    `Cordialement,\n${form.nom}`
   );
+
+  const emailTo  = offre.emailRecruteur || offre.emailPublicateur || "";
+  const emailBcc = (offre.emailPublicateur && offre.emailPublicateur !== emailTo) ? offre.emailPublicateur : "";
+  const mailtoHref = `mailto:${emailTo}` +
+    `?subject=${sujet}` +
+    (emailBcc ? `&bcc=${encodeURIComponent(emailBcc)}` : "") +
+    `&body=${corps}`;
+
+  const waMsg = encodeURIComponent(
+    `Bonjour, je vous contacte au sujet de votre offre de ${offre.type||"poste"} « ${offre.titre} » chez ${offre.ent}.\n` +
+    `Je suis ${form.nom}${form.filiere ? `, ${form.filiere}` : ""}${form.promo ? `, ${form.promo}` : ""}.\n` +
+    (form.message ? `\n${form.message}` : "")
+  );
+  const waHref = offre.waRecruteur ? `https://wa.me/${offre.waRecruteur.replace(/\D/g,"")}?text=${waMsg}` : null;
+
+  const cb = offre.contactBy || {};
+  const channels = [
+    cb.email    && emailTo && { key:"email",    label:"Envoyer par Email",    icon:"✉️",  href:mailtoHref,     bg:"#eff6ff", color:"#2563eb", border:"#bfdbfe", hint:"Votre client mail s'ouvrira avec un message pré-rempli. Pensez à joindre votre CV" + (offre.lmReq?" et votre lettre de motivation":"")+"."},
+    cb.whatsapp && waHref  && { key:"whatsapp", label:"Envoyer sur WhatsApp", icon:"📱",  href:waHref,         bg:"#f0fdf4", color:"#059669", border:"#bbf7d0", hint:"WhatsApp s'ouvrira avec un message pré-rempli. Vous pouvez y joindre vos documents.", external:true },
+    cb.linkedin && offre.linkedinUrl && { key:"linkedin", label:"Postuler sur LinkedIn", icon:"💼", href:offre.linkedinUrl, bg:"#f0f9ff", color:"#0369a1", border:"#bae6fd", hint:"La page LinkedIn de l'offre s'ouvrira dans votre navigateur.", external:true },
+  ].filter(Boolean);
 
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.55)",
@@ -249,28 +300,21 @@ function ModalCandidature({ offre, profile, onClose }) {
       <div onClick={e=>e.stopPropagation()} className="modal-enter"
         style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:480, boxShadow:SHADOWS["2xl"], padding:"26px 22px 28px" }}>
 
-        {success ? (
-          <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:"3rem", marginBottom:14 }}>🎉</div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem", color:C.navy, marginBottom:8 }}>Candidature envoyée !</div>
-            <p style={{ fontSize:"0.85rem", color:C.muted, lineHeight:1.7, marginBottom:20 }}>
-              Votre candidature pour <strong>{offre.titre}</strong> chez <strong>{offre.ent}</strong> a bien été transmise.<br/>
-              {offre.contact && <>Contact direct : <strong>{offre.contact}</strong></>}
-            </p>
-            <button onClick={onClose} style={{ ...css.btnPrimary, borderRadius:12, padding:"12px 28px" }}>Fermer</button>
-          </div>
-        ) : (
-          <>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-              <div>
-                <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy }}>📝 Postuler</div>
-                <div style={{ fontSize:"0.8rem", color:C.muted, marginTop:2 }}>{offre.titre} · {offre.ent}</div>
-              </div>
-              <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+        {/* En-tête */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+          <div>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy }}>
+              {step === "form" ? "📝 Postuler" : "📤 Envoyer vos documents"}
             </div>
+            <div style={{ fontSize:"0.8rem", color:C.muted, marginTop:2 }}>{offre.titre} · {offre.ent}</div>
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+        </div>
 
+        {step === "form" ? (
+          <>
+            {/* Étape 1 : formulaire */}
             {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
-            {uploading && <div style={{ background:C.blueLight, borderRadius:9, padding:"8px 12px", marginBottom:12, fontSize:"0.8rem", color:C.blue }}>⏳ Envoi des fichiers…</div>}
 
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <div><label style={css.label}>Nom complet *</label>
@@ -288,24 +332,55 @@ function ModalCandidature({ offre, profile, onClose }) {
               <label style={css.label}>Promotion</label>
               <input style={css.input} value={form.promo} onChange={e=>set("promo",e.target.value)} placeholder="Ex: Promo 32"/>
             </div>
-            <div style={{ marginBottom:12 }}>
-              <label style={css.label}>Lettre de motivation / Message</label>
+            <div style={{ marginBottom:18 }}>
+              <label style={css.label}>Message de motivation</label>
               <textarea style={{...css.input,resize:"none",minHeight:80}} placeholder="Présentez-vous et expliquez votre motivation…"
                 value={form.message} onChange={e=>set("message",e.target.value)}/>
             </div>
 
-            {/* Uploads documents */}
-            <div style={{ background:C.surfaceAlt, borderRadius:12, padding:"12px 14px", marginBottom:16 }}>
-              <div style={{ fontSize:"0.78rem", fontWeight:700, color:C.navy, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.04em" }}>
-                📎 Documents
+            {/* Docs requis (info seulement, sans upload) */}
+            {(offre.cvReq || offre.lmReq) && (
+              <div style={{ background:C.blueLight, borderRadius:10, padding:"10px 12px", marginBottom:16, fontSize:"0.8rem", color:C.blue }}>
+                ℹ️ Cette offre requiert {[offre.cvReq&&"un CV", offre.lmReq&&"une lettre de motivation"].filter(Boolean).join(" et ")}. Vous pourrez les joindre à l'étape suivante.
               </div>
-              <FileInput label="CV" file={cvFile} setter={setCvFile} required={offre.cvReq}/>
-              <FileInput label="Lettre de motivation" file={lmFile} setter={setLmFile} required={offre.lmReq}/>
+            )}
+
+            <button onClick={handleSubmit} disabled={saving}
+              style={{ ...css.btnPrimary, width:"100%", padding:"13px", borderRadius:12, opacity:saving?0.7:1 }}>
+              {saving ? "Enregistrement…" : "Postuler →"}
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Étape 2 : contact */}
+            <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:12, padding:"12px 14px", marginBottom:20, fontSize:"0.83rem", color:"#166534" }}>
+              ✅ Votre candidature a bien été enregistrée ! Le publieur de l'offre a reçu une notification.<br/>
+              <span style={{ color:"#15803d", fontWeight:600 }}>Envoyez maintenant vos documents via le canal de votre choix :</span>
             </div>
 
-            <button onClick={handleSubmit} disabled={saving||uploading}
-              style={{ ...css.btnPrimary, width:"100%", padding:"13px", borderRadius:12, opacity:(saving||uploading)?0.7:1 }}>
-              {saving ? "Envoi en cours…" : "Envoyer ma candidature →"}
+            {channels.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"20px 0", color:C.muted }}>
+                <div style={{ fontSize:"2rem", marginBottom:8 }}>📭</div>
+                Aucun canal de contact précisé pour cette offre. Contactez le publieur directement.
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:20 }}>
+                {channels.map(ch => (
+                  <div key={ch.key} style={{ background:ch.bg, border:`1px solid ${ch.border}`, borderRadius:14, padding:"14px 16px" }}>
+                    <a href={ch.href} target={ch.external?"_blank":"_self"} rel="noreferrer"
+                      style={{ display:"flex", alignItems:"center", gap:12, textDecoration:"none", marginBottom:8 }}>
+                      <span style={{ fontSize:"1.6rem" }}>{ch.icon}</span>
+                      <span style={{ fontWeight:700, fontSize:"0.95rem", color:ch.color }}>{ch.label}</span>
+                      <span style={{ marginLeft:"auto", fontSize:"0.85rem", color:ch.color, opacity:0.8 }}>→</span>
+                    </a>
+                    <p style={{ margin:0, fontSize:"0.76rem", color:ch.color, opacity:0.85, lineHeight:1.5 }}>{ch.hint}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={onClose} style={{ ...css.btnPrimary, width:"100%", borderRadius:12, padding:"12px" }}>
+              Fermer
             </button>
           </>
         )}
@@ -372,8 +447,6 @@ function ModalCandidaturesRecues({ offre, onClose }) {
                 <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:c.message?8:0 }}>
                   {c.email && <a href={`mailto:${c.email}`} style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>✉️ {c.email}</a>}
                   {c.tel   && <a href={`tel:${c.tel}`}      style={{ ...css.badge(C.surfaceAlt, C.mid), textDecoration:"none" }}>📞 {c.tel}</a>}
-                  {c.cvUrl && <a href={c.cvUrl} target="_blank" rel="noreferrer" style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>📎 CV</a>}
-                  {c.lmUrl && <a href={c.lmUrl} target="_blank" rel="noreferrer" style={{ ...css.badge(C.blueLight, C.blue), textDecoration:"none" }}>✍️ LM</a>}
                 </div>
                 {c.message && (
                   <div style={{ fontSize:"0.82rem", color:C.dark, background:C.surfaceAlt, borderRadius:8, padding:"8px 10px", lineHeight:1.65 }}>
@@ -461,6 +534,9 @@ function CarteOffre({ offre, allUsers, onPostule, onViewAlumni, currentUserUid }
             {offre.cvReq  && <span style={{ ...css.badge(C.blueLight,C.blue) }}>📎 CV requis</span>}
             {offre.lmReq  && <span style={{ ...css.badge(C.blueLight,C.blue) }}>✍️ Lettre de motivation</span>}
             {offre.contact&& <span style={{ ...css.badge(C.greenLight,C.green) }}>📧 {offre.contact}</span>}
+            {offre.contactBy?.email    && <span style={{ ...css.badge("#eff6ff","#2563eb") }}>✉️ Email</span>}
+            {offre.contactBy?.whatsapp && <span style={{ ...css.badge("#f0fdf4","#059669") }}>📱 WhatsApp</span>}
+            {offre.contactBy?.linkedin && <span style={{ ...css.badge("#f0f9ff","#0369a1") }}>💼 LinkedIn</span>}
           </div>
         </div>
       )}

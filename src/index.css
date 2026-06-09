@@ -87,10 +87,12 @@ body {
 .animate-bounce-in { animation: bounceIn 0.4s  cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ── Page transition ─────────────────────────────── */
-.page-enter { animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* fill-mode "backwards" et non "both" : après l'animation, transform est supprimé
+   ce qui empêche les enfants position:fixed (modals) d'être piégés dans le conteneur */
+.page-enter { animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* ── Modal ───────────────────────────────────────── */
-.modal-enter { animation: scaleIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.modal-enter { animation: scaleIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* ── Skeleton ────────────────────────────────────── */
 .skeleton {

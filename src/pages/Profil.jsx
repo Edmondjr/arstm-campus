@@ -16,9 +16,12 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   const showTel   = !!user.tel      && priv.showTel      !== false;
   const showWa    = !!user.whatsapp && priv.showWhatsapp  !== false;
   const showEmail = !!user.email    && priv.showEmail     !== false;
-  const waHref    = showWa  ? `https://wa.me/${((user.waIndicatif||"")+user.whatsapp).replace(/\D/g,"")}` : null;
-  const smsHref   = showTel ? `sms:${(user.indicatif||"")}${user.tel}` : null;
-  const telHref   = showTel ? `tel:${(user.indicatif||"")}${user.tel}` : null;
+  // Si le numéro commence déjà par "+" il contient déjà l'indicatif — on ne le redouble pas
+  const fullWa  = showWa  ? (user.whatsapp.startsWith("+") ? user.whatsapp : (user.waIndicatif||"")+user.whatsapp) : null;
+  const fullTel = showTel ? (user.tel.startsWith("+")      ? user.tel      : (user.indicatif||"")+user.tel)        : null;
+  const waHref    = fullWa  ? `https://wa.me/${fullWa.replace(/\D/g,"")}` : null;
+  const smsHref   = fullTel ? `sms:${fullTel}` : null;
+  const telHref   = fullTel ? `tel:${fullTel}` : null;
 
   // Construire la liste de canaux de contact disponibles
   const contacts = [
@@ -439,8 +442,8 @@ export default function PageProfil({ profile, onLogout, setPage }) {
               </div>
             ):(
               <div>
-                <ContactRow icon="📞" label="Téléphone" val={profile?.tel?`${profile?.indicatif||""} ${profile.tel}`:null}/>
-                <ContactRow icon="💚" label="WhatsApp" val={profile?.whatsapp?`${profile?.waIndicatif||""} ${profile.whatsapp}`:null} green/>
+                <ContactRow icon="📞" label="Téléphone" val={profile?.tel?(profile.tel.startsWith("+")?profile.tel:`${profile?.indicatif||""} ${profile.tel}`):null}/>
+                <ContactRow icon="💚" label="WhatsApp" val={profile?.whatsapp?(profile.whatsapp.startsWith("+")?profile.whatsapp:`${profile?.waIndicatif||""} ${profile.whatsapp}`):null} green/>
               </div>
             )}
           </Card>

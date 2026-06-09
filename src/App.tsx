@@ -73,8 +73,9 @@ export default function App() {
   const [activeMode, setActiveMode]   = useState(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
-  const [showSearch, setShowSearch]   = useState(false);
-  const [searchUser, setSearchUser]   = useState(null);
+  const [showSearch, setShowSearch]         = useState(false);
+  const [showMembersSearch, setShowMembersSearch] = useState(false);
+  const [searchUser, setSearchUser]         = useState(null);
   const [socialTab, setSocialTab]     = useState<string|undefined>(undefined);
   const { unread: notifUnread } = useNotifs(user?.uid);
 
@@ -322,7 +323,7 @@ export default function App() {
 
       {/* ── FAB CONTACT — ouvre la recherche de membres ── */}
       <button
-        onClick={() => setShowSearch(true)}
+        onClick={() => setShowMembersSearch(true)}
         title="Contacter un membre"
         style={{
           position:"fixed", bottom:isMobile?72:24, right:16, zIndex:800,
@@ -382,6 +383,15 @@ export default function App() {
           onClose={() => setShowSearch(false)}
           onNavigate={goTo}
           onOpenProfil={(u) => setSearchUser(u)}
+        />
+      )}
+      {/* ── RECHERCHE MEMBRES (FAB) ── */}
+      {showMembersSearch && (
+        <GlobalSearch
+          membersOnly
+          onClose={() => setShowMembersSearch(false)}
+          onNavigate={goTo}
+          onOpenProfil={(u) => { setSearchUser(u); setShowMembersSearch(false); }}
         />
       )}
       {searchUser && (

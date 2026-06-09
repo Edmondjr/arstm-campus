@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../AuthContext";
 import { C, ROLES, css } from "../design";
-import { updateDocument } from "../hooks/useFirestore";
+import { updateDocument, sendNotif } from "../hooks/useFirestore";
 import { db, auth } from "../firebase";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 // ─── Profil Externe — modal au clic sur un utilisateur ────────────────────────
 export function ProfilExterne({ user, onClose, onMessage }) {
@@ -31,8 +31,8 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   const cols = contacts.length >= 3 ? 3 : contacts.length === 2 ? 2 : 1;
 
   return (
-    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", paddingBottom:32 }} className="modal-enter">
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px", overflowY:"auto" }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.35)", paddingBottom:32, margin:"auto" }} className="modal-enter">
         {/* Bannière */}
         <div style={{ background:`linear-gradient(135deg,${roleInfo.color}18,${roleInfo.color}35)`, padding:"24px 20px 18px", position:"relative" }}>
           <button onClick={onClose} style={{ position:"absolute", top:12, right:14, background:"rgba(255,255,255,0.85)", border:"none", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontSize:"0.85rem", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700 }}>✕</button>
@@ -122,6 +122,14 @@ export default function PageProfil({ profile, onLogout, setPage }) {
   const [editEmployeur, setEditEmployeur]   = useState(profile?.employeur||"");
   const [editPoste, setEditPoste]       = useState(profile?.poste||"");
   const [editService, setEditService]   = useState(profile?.service||profile?.promo||"");
+  const [editFiliere, setEditFiliere]   = useState(profile?.filiere||"");
+  const [editPromo, setEditPromo]       = useState(profile?.promo||"");
+  // Name/email change request
+  const [changeReqModal, setChangeReqModal] = useState(null); // "name" | "email" | null
+  const [changeReqVal, setChangeReqVal]     = useState("");
+  const [changeReqReason, setChangeReqReason] = useState("");
+  const [changeReqSending, setChangeReqSending] = useState(false);
+  const [changeReqDone, setChangeReqDone]   = useState(false);
 
   const [stats, setStats] = useState({posts:0,ressources:0,offres:0,annonces:0});
   useEffect(()=>{
@@ -143,6 +151,16 @@ export default function PageProfil({ profile, onLogout, setPage }) {
   const initials = profile?.avatar||profile?.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
   const ECOLES   = ["ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"];
   const CODES    = ["+225","+223","+226","+228","+229","+221","+237","+243","+33","+1","+44"];
+  const FILIERES_ETUDIANT = [
+    { group:"LPTML", opts:["LPTML - 1ère Année","LPTML - Port Manutention 2e Année","LPTML - Port Manutention 3e Année","LPTML - Transit Consignation et Armement 2e Année","LPTML - Transit Consignation et Armement 3e Année","LPTML - Transport Multimodal 2e Année","LPTML - Transport Multimodal 3e Année"] },
+    { group:"MPTML", opts:["MPTML - Gestion Portuaire et Maritime 1ère Année","MPTML - Gestion Portuaire et Maritime 2e Année","MPTML - Logistique et Transport 1ère Année","MPTML - Logistique et Transport 2e Année"] },
+    { group:"Sciences Nautiques", opts:["LPSN – Sciences Nautiques 1ère Année","LPSN – Sciences Nautiques 2e Année","LPSN – Sciences Nautiques 3e Année","MPSN – Capitaine au long cours","PC 750","CHEF DE QUART","ELEVE CHEF DE QUART"] },
+    { group:"Mécanique Navale", opts:["LPMN – Mécanique Navale 1ère Année","LPMN – Mécanique Navale 2e Année","LPMN – Mécanique Navale 3e Année","MPMN – Officier Mécanicien 1ère Classe","MPMN – Officier Mécanicien 2e Classe"] },
+    { group:"Génie Thermique", opts:["LPGT – Génie Thermique 1ère Année","LPGT – Génie Thermique 2e Année","LPGT – Génie Thermique 3e Année"] },
+    { group:"Réseau Informatique", opts:["LPRIT – Réseau Informatique et Télécom 1ère Année","LPRIT – Réseau Informatique et Télécom 2e Année","LPRIT – Réseau Informatique et Télécom 3e Année"] },
+    { group:"Autres", opts:["CEAM – Matelot Polyvalent","FOAD","Formation Continue"] },
+  ];
+  const FILIERES_ALUMNI = ["LPTML - Port Manutention","LPTML - Transit Consignation et Armement","LPTML - Transport Multimodal","MPTML - Gestion Portuaire et Maritime","MPTML - Logistique et Transport","Sciences Nautiques","Capitaine au long cours","Mécanique Navale","Officier Mécanicien","Génie Thermique","Réseau Informatique et Télécom","CEAM","FOAD","Formation Continue","Autre"];
 
   const handlePhotoUpload = async(e)=>{
     const file=e.target.files[0]; if(!file) return;
@@ -162,12 +180,43 @@ export default function PageProfil({ profile, onLogout, setPage }) {
   const handleSave=async()=>{
     setSaving(true);
     const u={bio:editBio,tel:editTel,whatsapp:editWa,indicatif:editIndicatif,waIndicatif:editWaInd};
+    if(profile?.role==="etudiant"){u.filiere=editFiliere;u.promo=editPromo;}
     if(profile?.role==="enseignant"){u.modules=editModules;u.ecoles=editEcoles;u.ecoleAutre=editEcoleAutre;}
-    if(profile?.role==="alumni"){u.employeur=editEmployeur;u.poste=editPoste;}
+    if(profile?.role==="alumni"){u.filiere=editFiliere;u.promo=editPromo;u.employeur=editEmployeur;u.poste=editPoste;}
     if(profile?.role==="administration"){u.service=editService;}
     await updateDocument("users",profile?.uid,u);
     if(reloadProfile) await reloadProfile(profile?.uid);
     setSaving(false); setEditMode(false);
+  };
+
+  const sendChangeRequest = async () => {
+    if(!changeReqVal.trim()) return;
+    setChangeReqSending(true);
+    try {
+      // Save request in Firestore
+      await addDoc(collection(db,"changeRequests"),{
+        uid:      profile?.uid,
+        name:     profile?.name,
+        email:    profile?.email,
+        field:    changeReqModal,
+        newValue: changeReqVal.trim(),
+        reason:   changeReqReason.trim(),
+        status:   "pending",
+        createdAt: serverTimestamp(),
+      });
+      // Notify superadmins
+      const admSnap = await getDocs(query(collection(db,"users"),where("role","==","superadmin")));
+      await Promise.all(admSnap.docs.map(d => sendNotif(d.id,{
+        type:      "change_request",
+        fromName:  profile?.name,
+        fromAvatar:profile?.avatar||profile?.name?.slice(0,2),
+        field:     changeReqModal,
+        newValue:  changeReqVal.trim(),
+      })));
+      setChangeReqDone(true);
+      setTimeout(()=>{setChangeReqModal(null);setChangeReqDone(false);setChangeReqVal("");setChangeReqReason("");},2500);
+    } catch(_){}
+    setChangeReqSending(false);
   };
 
   const handleChangePwd=async()=>{
@@ -219,9 +268,38 @@ export default function PageProfil({ profile, onLogout, setPage }) {
         </div>
       </div>
     );
+    if(profile?.role==="etudiant") return(
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+        <div>
+          <span style={css.label}>Filière</span>
+          <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
+            <option value="">Sélectionner votre filière...</option>
+            {FILIERES_ETUDIANT.map(g=>(
+              <optgroup key={g.group} label={g.group}>
+                {g.opts.map(o=><option key={o} value={o}>{o}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div>
+          <span style={css.label}>Promotion (année d'entrée)</span>
+          <input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2024" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/>
+        </div>
+      </div>
+    );
     if(profile?.role==="alumni") return(
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <div><span style={css.label}>Employeur</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Entreprise" value={editEmployeur} onChange={e=>setEditEmployeur(e.target.value)}/></div>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+        <div>
+          <span style={css.label}>Filière (formation suivie)</span>
+          <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
+            <option value="">Sélectionner votre filière...</option>
+            {FILIERES_ALUMNI.map(o=><option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div><span style={css.label}>Promotion</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2020" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/></div>
+          <div><span style={css.label}>Employeur</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Entreprise" value={editEmployeur} onChange={e=>setEditEmployeur(e.target.value)}/></div>
+        </div>
         <div><span style={css.label}>Poste</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Poste" value={editPoste} onChange={e=>setEditPoste(e.target.value)}/></div>
       </div>
     );
@@ -266,8 +344,14 @@ export default function PageProfil({ profile, onLogout, setPage }) {
                 <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoUpload}/>
               </label>}
             </div>
-            <div>
-              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1.1rem",color:C.navy,lineHeight:1.2}}>{profile?.name}</div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1.1rem",color:C.navy,lineHeight:1.2}}>{profile?.name}</div>
+                <button onClick={()=>{setChangeReqModal("name");setChangeReqVal("");setChangeReqReason("");}}
+                  style={{fontSize:"0.68rem",padding:"2px 8px",borderRadius:100,border:`1px solid ${C.border}`,background:C.surfaceAlt,color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>
+                  ✏️ Modifier
+                </button>
+              </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
                 <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:100,fontSize:"0.72rem",fontWeight:700,background:roleInfo.bg,color:roleInfo.color}}>{roleInfo.icon} {roleInfo.label}</span>
                 {profile?.filiere&&<span style={{padding:"3px 8px",borderRadius:100,fontSize:"0.7rem",background:C.blueLight,color:C.blue,fontWeight:600}}>{profile.filiere.split(" - ")[0]}</span>}
@@ -288,8 +372,12 @@ export default function PageProfil({ profile, onLogout, setPage }) {
             </div>
           )}
 
-          <div style={{fontSize:"0.77rem",color:C.muted,display:"flex",alignItems:"center",gap:6}}>
+          <div style={{fontSize:"0.77rem",color:C.muted,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span>✉️</span><span>{profile?.email}</span>
+            <button onClick={()=>{setChangeReqModal("email");setChangeReqVal("");setChangeReqReason("");}}
+              style={{fontSize:"0.65rem",padding:"2px 7px",borderRadius:100,border:`1px solid ${C.border}`,background:C.surfaceAlt,color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>
+              ✏️ Modifier
+            </button>
           </div>
         </div>
       </div>
@@ -426,6 +514,45 @@ export default function PageProfil({ profile, onLogout, setPage }) {
       <button onClick={()=>setConfirmLogout(true)} style={{width:"100%",padding:"12px",borderRadius:12,marginTop:12,background:C.redLight,color:C.red,border:`1px solid ${C.redBorder}`,fontWeight:700,fontSize:"0.87rem",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
         🚪 Se déconnecter
       </button>
+
+      {/* ── MODAL DEMANDE MODIFICATION NOM/EMAIL ── */}
+      {changeReqModal&&(
+        <div onClick={()=>setChangeReqModal(null)} style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:20,padding:"24px 20px",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1rem",color:C.navy,marginBottom:6}}>
+              Demander modification {changeReqModal==="name"?"du nom":"de l'email"}
+            </div>
+            <p style={{fontSize:"0.8rem",color:C.muted,marginBottom:14,lineHeight:1.6}}>
+              Cette modification nécessite une approbation par l'équipe ARSTM. Vous serez notifié une fois traitée.
+            </p>
+            {changeReqDone?(
+              <div style={{padding:"14px",background:"#f0fdf4",borderRadius:10,textAlign:"center",color:"#059669",fontWeight:600,fontSize:"0.87rem"}}>
+                ✅ Demande envoyée ! L'équipe ARSTM la traitera sous 48h.
+              </div>
+            ):(
+              <>
+                <div style={{marginBottom:10}}>
+                  <span style={css.label}>Nouveau {changeReqModal==="name"?"nom":"email"}</span>
+                  <input style={{...css.input}} placeholder={changeReqModal==="name"?"Votre nouveau nom complet":"Votre nouvelle adresse email"}
+                    value={changeReqVal} onChange={e=>setChangeReqVal(e.target.value)}/>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <span style={css.label}>Motif / Justification</span>
+                  <textarea style={{...css.input,resize:"none",minHeight:60}} placeholder="Expliquez brièvement la raison de cette modification..."
+                    value={changeReqReason} onChange={e=>setChangeReqReason(e.target.value)}/>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>setChangeReqModal(null)} style={{...css.btnSecondary,flex:1}}>Annuler</button>
+                  <button onClick={sendChangeRequest} disabled={!changeReqVal.trim()||changeReqSending}
+                    style={{...css.btnPrimary,flex:1,opacity:(!changeReqVal.trim()||changeReqSending)?0.6:1}}>
+                    {changeReqSending?"Envoi…":"Envoyer →"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL DÉCONNEXION ── */}
       {confirmLogout&&(

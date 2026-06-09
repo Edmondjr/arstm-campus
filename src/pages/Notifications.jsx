@@ -1,18 +1,22 @@
 // src/pages/Notifications.jsx
 import { useEffect } from "react";
 import { C, ROLES, css } from "../design";
-import { useNotifs, markNotifsRead, updateDocument } from "../hooks/useFirestore";
+import { useNotifs, markNotifsRead } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
-import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase";
 
 const TYPE_META = {
-  comment:  { icon:"💬", label:"a commenté votre publication", color:C.blue,   bg:C.blueLight },
-  reaction: { icon:"❤️", label:"a réagi à votre publication",  color:"#dc2626", bg:"#fef2f2" },
-  share:    { icon:"🔁", label:"a partagé votre publication",   color:C.green,  bg:C.greenLight },
-  message:  { icon:"✉️", label:"vous a envoyé un message",     color:C.aqua,   bg:"#ecfeff" },
-  annonce:  { icon:"📢", label:"Nouvelle annonce urgente",      color:C.red,    bg:C.redLight },
-  group:    { icon:"👥", label:"a rejoint votre groupe",        color:C.green,  bg:C.greenLight },
+  comment:        { icon:"💬", label:"a commenté votre publication",       color:C.blue,    bg:C.blueLight,  page:"social" },
+  reaction:       { icon:"❤️", label:"a réagi à votre publication",        color:"#dc2626", bg:"#fef2f2",    page:"social" },
+  share:          { icon:"🔁", label:"a partagé votre publication",         color:C.green,   bg:C.greenLight, page:"social" },
+  message:        { icon:"✉️", label:"vous a envoyé un message",           color:C.aqua,    bg:"#ecfeff",    page:"social" },
+  annonce:        { icon:"📢", label:"Nouvelle annonce urgente",            color:C.red,     bg:C.redLight,   page:"annonces" },
+  group:          { icon:"👥", label:"a rejoint votre groupe",              color:C.green,   bg:C.greenLight, page:"social" },
+  nouveau_post:   { icon:"📝", label:"a publié une nouvelle publication",   color:C.blue,    bg:C.blueLight,  page:"social" },
+  offre:          { icon:"💼", label:"a publié une nouvelle offre d'emploi",color:"#d97706", bg:"#fffbeb",    page:"alumni" },
+  conseil:        { icon:"🎯", label:"a partagé un conseil carrière",       color:"#7c3aed", bg:"#faf5ff",    page:"alumni" },
+  candidature:    { icon:"📄", label:"a candidaté à votre offre",          color:C.blue,    bg:C.blueLight,  page:"alumni" },
+  avertissement:  { icon:"⚠️", label:"Avertissement de l'équipe ARSTM",    color:"#dc2626", bg:"#fef2f2",    page:null },
+  change_request: { icon:"📋", label:"demande de modification de profil",   color:C.navy,    bg:C.surfaceAlt, page:"admin" },
 };
 
 export default function PageNotifications({ profile, onGoTo }) {
@@ -20,7 +24,6 @@ export default function PageNotifications({ profile, onGoTo }) {
   const uid = user?.uid || profile?.uid;
   const { notifs, unread, loading } = useNotifs(uid);
 
-  // Mark all as read when we open this page
   useEffect(() => {
     if (!uid || unread === 0) return;
     const unsub = markNotifsRead(uid);
@@ -34,6 +37,11 @@ export default function PageNotifications({ profile, onGoTo }) {
     if (diff < 3600000) return `il y a ${Math.floor(diff/60000)} min`;
     if (diff < 86400000) return `il y a ${Math.floor(diff/3600000)}h`;
     return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short" });
+  };
+
+  const handleClick = (n) => {
+    const meta = TYPE_META[n.type] || TYPE_META.comment;
+    if (meta.page && onGoTo) onGoTo(meta.page);
   };
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.muted }}>Chargement…</div>;
@@ -62,15 +70,19 @@ export default function PageNotifications({ profile, onGoTo }) {
         )}
         {notifs.map(n => {
           const meta = TYPE_META[n.type] || TYPE_META.comment;
+          const isClickable = !!meta.page;
           return (
             <div key={n.id}
-              onClick={() => n.postId && onGoTo && onGoTo("social")}
+              onClick={() => handleClick(n)}
               style={{
-                ...css.card, display:"flex", gap:12, cursor:n.postId?"pointer":"default",
+                ...css.card, display:"flex", gap:12,
+                cursor: isClickable ? "pointer" : "default",
                 background: n.read ? "#fff" : `${meta.bg}80`,
                 borderLeft:`3px solid ${n.read ? C.border : meta.color}`,
                 transition:"all 0.15s",
-              }}>
+              }}
+              onMouseEnter={e => isClickable && (e.currentTarget.style.background = `${meta.bg}cc`)}
+              onMouseLeave={e => e.currentTarget.style.background = n.read ? "#fff" : `${meta.bg}80`}>
               <div style={{ width:44, height:44, borderRadius:"50%", background:meta.bg,
                 display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.2rem", flexShrink:0 }}>
                 {n.fromAvatar ? (
@@ -85,15 +97,22 @@ export default function PageNotifications({ profile, onGoTo }) {
                   {n.fromName && <strong style={{ color:C.navy }}>{n.fromName} </strong>}
                   {meta.label}
                   {n.emoji && <span style={{ marginLeft:4 }}>{n.emoji}</span>}
+                  {n.field && <span style={{ color:C.muted, fontSize:"0.82rem" }}> ({n.field === "name" ? "nom" : "email"} → {n.newValue})</span>}
                 </div>
                 {n.postText && (
                   <div style={{ fontSize:"0.76rem", color:C.muted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:4, padding:"4px 8px", background:C.surfaceAlt, borderRadius:6 }}>
                     "{n.postText}"
                   </div>
                 )}
-                <div style={{ fontSize:"0.72rem", color:C.muted, display:"flex", alignItems:"center", gap:6 }}>
-                  {!n.read && <span style={{ width:6, height:6, borderRadius:"50%", background:meta.color, display:"inline-block" }}/>}
+                {n.titre && (
+                  <div style={{ fontSize:"0.76rem", color:C.muted, marginBottom:4, padding:"4px 8px", background:C.surfaceAlt, borderRadius:6 }}>
+                    {n.titre}
+                  </div>
+                )}
+                <div style={{ fontSize:"0.72rem", color:C.muted, display:"flex", alignItems:"center", gap:8 }}>
+                  {!n.read && <span style={{ width:6, height:6, borderRadius:"50%", background:meta.color, display:"inline-block", flexShrink:0 }}/>}
                   {fmt(n.createdAt)}
+                  {isClickable && <span style={{ color:meta.color, fontWeight:600 }}>Voir →</span>}
                 </div>
               </div>
             </div>

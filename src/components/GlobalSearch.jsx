@@ -15,9 +15,9 @@ const FILTERS = [
   ["posts","Publications","💬"],
 ];
 
-export default function GlobalSearch({ onClose, onNavigate, onOpenProfil }) {
+export default function GlobalSearch({ onClose, onNavigate, onOpenProfil, membersOnly = false }) {
   const [q, setQ]       = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(membersOnly ? "members" : "all");
   const inputRef = useRef();
 
   const { data: users }      = useCollection("users", []);
@@ -51,8 +51,10 @@ export default function GlobalSearch({ onClose, onNavigate, onOpenProfil }) {
     return { members, annonces:ann, ressources:res, posts:pos };
   }, [nq, users, annonces, ressources, posts]);
 
-  const totalCount = results.members.length + results.annonces.length + results.ressources.length + results.posts.length;
-  const show = (key) => filter === "all" || filter === key;
+  const totalCount = membersOnly
+    ? results.members.length
+    : results.members.length + results.annonces.length + results.ressources.length + results.posts.length;
+  const show = (key) => !membersOnly && (filter === "all" || filter === key);
 
   const go = (page) => { onNavigate(page); onClose(); };
 
@@ -66,28 +68,32 @@ export default function GlobalSearch({ onClose, onNavigate, onOpenProfil }) {
         <div style={{ padding:"14px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
           <span style={{ fontSize:"1.1rem" }}>🔍</span>
           <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
-            placeholder="Rechercher membres, annonces, ressources, publications…"
+            placeholder={membersOnly ? "Rechercher un membre ARSTM…" : "Rechercher membres, annonces, ressources, publications…"}
             style={{ flex:1, border:"none", outline:"none", fontSize:"0.95rem", fontFamily:"inherit", color:C.dark, background:"transparent" }}/>
           <button onClick={onClose} style={{ width:28, height:28, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", color:C.muted, fontSize:"0.85rem" }}>✕</button>
         </div>
 
         {/* Filtres */}
-        <div style={{ display:"flex", gap:6, padding:"10px 16px", borderBottom:`1px solid ${C.border}`, overflowX:"auto", flexShrink:0 }}>
-          {FILTERS.map(([v,l,ic]) => (
-            <button key={v} onClick={() => setFilter(v)} style={{
-              padding:"5px 12px", borderRadius:20, border:`1px solid ${filter===v?C.blue:C.border}`,
-              background:filter===v?C.blue:"#fff", color:filter===v?"#fff":C.mid,
-              cursor:"pointer", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", whiteSpace:"nowrap",
-            }}>{ic} {l}</button>
-          ))}
-        </div>
+        {!membersOnly && (
+          <div style={{ display:"flex", gap:6, padding:"10px 16px", borderBottom:`1px solid ${C.border}`, overflowX:"auto", flexShrink:0 }}>
+            {FILTERS.map(([v,l,ic]) => (
+              <button key={v} onClick={() => setFilter(v)} style={{
+                padding:"5px 12px", borderRadius:20, border:`1px solid ${filter===v?C.blue:C.border}`,
+                background:filter===v?C.blue:"#fff", color:filter===v?"#fff":C.mid,
+                cursor:"pointer", fontFamily:"inherit", fontWeight:600, fontSize:"0.78rem", whiteSpace:"nowrap",
+              }}>{ic} {l}</button>
+            ))}
+          </div>
+        )}
 
         {/* Résultats */}
         <div style={{ flex:1, overflowY:"auto", padding:"8px 0" }}>
           {!nq && (
             <div style={{ padding:40, textAlign:"center", color:C.muted }}>
-              <div style={{ fontSize:"2.5rem", marginBottom:10 }}>🔍</div>
-              <div style={{ fontSize:"0.86rem" }}>Tapez pour rechercher dans tout le campus.</div>
+              <div style={{ fontSize:"2.5rem", marginBottom:10 }}>{membersOnly ? "👥" : "🔍"}</div>
+              <div style={{ fontSize:"0.86rem" }}>
+                {membersOnly ? "Tapez le nom d'un membre pour le contacter." : "Tapez pour rechercher dans tout le campus."}
+              </div>
             </div>
           )}
           {nq && totalCount === 0 && (
@@ -98,7 +104,7 @@ export default function GlobalSearch({ onClose, onNavigate, onOpenProfil }) {
           )}
 
           {/* Membres */}
-          {show("members") && results.members.length > 0 && (
+          {(membersOnly || show("members")) && results.members.length > 0 && (
             <Section title="👥 Membres" count={results.members.length}>
               {results.members.map(u => {
                 const ri = getRoleInfo(u.role);

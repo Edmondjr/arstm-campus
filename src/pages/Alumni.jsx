@@ -1,9 +1,10 @@
 // src/pages/Alumni.jsx — offres enrichies + candidatures + conseils carrière
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C, css, ROLES, SHADOWS } from "../design";
 import { useOffres, addDocument, useCollection, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
 import { ProfilExterne } from "./Profil";
+import { useAI } from "../hooks/useAI";
 import { collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, deleteDoc, doc, increment, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -21,6 +22,8 @@ const CODES = ["+225","+223","+226","+228","+229","+221","+237","+243","+33","+1
 // ── Formulaire publication d'offre ─────────────────────────────────────────
 function FormulaireOffre({ profile, onClose, onDone }) {
   const { user } = useAuth();
+  const { parseJobOffer, loading: aiLoading } = useAI();
+  const aiFileRef = useRef();
   const [form, setForm] = useState({
     titre:"", ent:"", type:"Stage", lieu:"Abidjan, Côte d'Ivoire",
     secteur:"", deadline:"", salaire:"", niveauReq:"",
@@ -70,7 +73,41 @@ function FormulaireOffre({ profile, onClose, onDone }) {
 
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
           <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.05rem", color:C.navy }}>💼 Publier une offre</div>
-          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <button
+              onClick={() => aiFileRef.current.click()} disabled={aiLoading}
+              title="Pré-remplir via image, PDF, Excel ou Word"
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 12px", borderRadius:20, border:"none",
+                cursor:aiLoading?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"0.76rem", fontWeight:600,
+                background:aiLoading?"#e2e8f0":"linear-gradient(135deg,#7c3aed,#2563eb)",
+                color:aiLoading?"#94a3b8":"#fff", opacity:aiLoading?0.7:1 }}>
+              {aiLoading ? "⏳ Analyse…" : "📥 Remplir via IA"}
+            </button>
+            <input ref={aiFileRef} type="file"
+              accept="image/*,.xlsx,.xls,.pdf,.doc,.docx"
+              style={{ display:"none" }}
+              onChange={async (e) => {
+                const f = e.target.files[0]; e.target.value = "";
+                if (!f) return;
+                const data = await parseJobOffer(f);
+                if (!data) return;
+                setForm(prev => ({
+                  ...prev,
+                  titre:     data.titre     || prev.titre,
+                  ent:       data.ent       || prev.ent,
+                  type:      ["Stage","CDI","CDD","Freelance"].includes(data.type) ? data.type : prev.type,
+                  lieu:      data.lieu      || prev.lieu,
+                  secteur:   data.secteur   || prev.secteur,
+                  salaire:   data.salaire   || prev.salaire,
+                  niveauReq: data.niveauReq || prev.niveauReq,
+                  deadline:  data.deadline  || prev.deadline,
+                  desc:      data.desc      || prev.desc,
+                  missions:  data.missions  || prev.missions,
+                  profil:    data.profil    || prev.profil,
+                }));
+              }}/>
+            <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:C.surfaceAlt, cursor:"pointer", fontSize:"0.9rem" }}>✕</button>
+          </div>
         </div>
 
         {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:14, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}

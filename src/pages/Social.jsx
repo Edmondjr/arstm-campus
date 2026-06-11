@@ -3,7 +3,6 @@ import { useState, useCallback, useRef } from "react";
 import { C, css, ROLES } from "../design";
 import { usePosts, addDocument, updateDocument, useCollection, useComments, addComment, deleteComment, sendNotif } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
-import { useAI } from "../hooks/useAI";
 import { ProfilExterne } from "./Profil";
 import PageMessages from "./Messages";
 import PageGroups from "./Groups";
@@ -372,7 +371,6 @@ function FormatToolbar({ textareaRef, setText }) {
 // ── Composer de post ──────────────────────────────────────────────────────────
 function PostComposer({ profile, onPublish, r }) {
   const { user } = useAuth();
-  const { improveText, loading: aiLoading } = useAI();
   const [text, setText]             = useState("");
   const [saving, setSaving]         = useState(false);
   const [mediaFile, setMedia]       = useState(null);
@@ -490,15 +488,8 @@ function PostComposer({ profile, onPublish, r }) {
           {profile.photoURL ? <img src={profile.photoURL} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (profile.avatar||profile.name?.slice(0,2))}
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+          <div style={{ marginBottom:4 }}>
             <FormatToolbar textareaRef={textareaRef} setText={setText}/>
-            <button
-              onClick={async () => { if (!text.trim()) return; const improved = await improveText(text, "publication réseau social scolaire"); if (improved) setText(improved); }}
-              disabled={aiLoading || !text.trim()}
-              title="Améliorer avec l'IA"
-              style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20, border:"none", cursor:aiLoading||!text.trim()?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"0.74rem", fontWeight:600, background:aiLoading?"#e2e8f0":"linear-gradient(135deg,#7c3aed,#2563eb)", color:aiLoading?C.muted:"#fff", opacity:!text.trim()?0.5:1, transition:"all 0.2s", flexShrink:0 }}>
-              {aiLoading ? "⏳ IA…" : "✨ IA"}
-            </button>
           </div>
           <textarea ref={textareaRef}
             style={{ ...css.input, resize:"none", minHeight:72, width:"100%", borderRadius:12 }}

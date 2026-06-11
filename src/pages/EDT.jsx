@@ -1,10 +1,11 @@
 // src/pages/EDT.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { C, css } from "../design";
 import { useEDT, addDocument, deleteDocument } from "../hooks/useFirestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase";
 import { useAuth } from "../AuthContext";
+import { useAI } from "../hooks/useAI";
 
 const JOURS_LIST = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const TAG_COLORS = {
@@ -20,6 +21,10 @@ export default function PageEDT({ profile }) {
   const jours = Object.keys(edt);
   const [jour, setJour] = useState(null);
   const actif = jour || jours[0] || "Lundi";
+  const { parseSchedule, loading: aiLoading, error: aiError } = useAI();
+  const [aiPreview, setAiPreview] = useState(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const aiFileRef = useRef();
 
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -91,11 +96,78 @@ export default function PageEDT({ profile }) {
           <div style={css.pageSub}>{profile?.promo || "ARSTM"} · Semaine en cours</div>
         </div>
         {canManage && (
-          <button style={css.btnPrimary} onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Annuler" : "+ Ajouter un cours"}
-          </button>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            <button style={css.btnPrimary} onClick={() => setShowForm(!showForm)}>
+              {showForm ? "Annuler" : "+ Ajouter un cours"}
+            </button>
+            <button
+              style={{ ...css.btnPrimary, background:"linear-gradient(135deg,#7c3aed,#2563eb)", opacity:aiLoading?0.7:1 }}
+              onClick={() => aiFileRef.current.click()} disabled={aiLoading}>
+              {aiLoading ? "⏳ Analyse…" : "📥 Importer via IA"}
+            </button>
+            <input ref={aiFileRef} type="file"
+              accept="image/*,.xlsx,.xls,.pdf,.doc,.docx"
+              style={{ display:"none" }}
+              onChange={async (e) => {
+                const f = e.target.files[0]; e.target.value = "";
+                if (!f) return;
+                const courses = await parseSchedule(f);
+                if (courses) setAiPreview(courses);
+              }}/>
+          </div>
         )}
       </div>
+
+      {/* ── APERÇU IA ── */}
+      {aiPreview && (
+        <div style={{ ...css.card, marginBottom:18, background:"#faf5ff", border:"1px solid #e9d5ff" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ fontWeight:700, color:"#7c3aed", fontSize:"0.95rem" }}>
+              🤖 {aiPreview.length} cours extraits — vérifiez avant d'enregistrer
+            </div>
+            <button onClick={() => setAiPreview(null)}
+              style={{ ...css.btnGhost, fontSize:"0.8rem", color:C.muted }}>✕ Annuler</button>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:320, overflowY:"auto", marginBottom:14 }}>
+            {aiPreview.map((c, i) => (
+              <div key={i} style={{ background:"#fff", borderRadius:10, padding:"10px 14px", border:"1px solid #e9d5ff" }}>
+                <div style={{ fontWeight:700, color:C.navy, fontSize:"0.88rem" }}>
+                  {c.matiere || "—"}
+                  <span style={{ fontWeight:400, color:C.muted }}> · {c.jour} {c.heureDebut}–{c.heureFin}</span>
+                </div>
+                <div style={{ color:C.muted, fontSize:"0.78rem", marginTop:3 }}>
+                  📍 {c.salle||"—"} · 👤 {c.prof||"—"}{c.promo ? ` · 🎓 ${c.promo}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+          {aiError && <div style={{ color:C.red, fontSize:"0.8rem", marginBottom:10 }}>⚠️ {aiError}</div>}
+          <button
+            style={{ ...css.btnPrimary, background:"linear-gradient(135deg,#7c3aed,#2563eb)", opacity:bulkSaving?0.7:1 }}
+            disabled={bulkSaving}
+            onClick={async () => {
+              setBulkSaving(true);
+              for (const c of aiPreview) {
+                await addDocument("edt", {
+                  jour:       c.jour       || "Lundi",
+                  heureDebut: c.heureDebut || "08:00",
+                  heureFin:   c.heureFin   || "10:00",
+                  matiere:    c.matiere    || "",
+                  salle:      c.salle      || "",
+                  prof:       c.prof       || "",
+                  tag:        "Logistique",
+                  color:      "#2563eb",
+                  promo:      c.promo      || profile?.promo || "",
+                  fileUrl:    "",
+                });
+              }
+              setBulkSaving(false);
+              setAiPreview(null);
+            }}>
+            {bulkSaving ? "⏳ Enregistrement…" : `✅ Enregistrer les ${aiPreview.length} cours`}
+          </button>
+        </div>
+      )}
 
       {/* ── FORMULAIRE ── */}
       {showForm && canManage && (

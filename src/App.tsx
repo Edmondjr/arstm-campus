@@ -1,23 +1,25 @@
 // src/App.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./AuthContext";
 import { C, ROLES, SHADOWS, GRADIENTS, css } from "./design";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import Login from "./pages/Login";
-import Accueil from "./pages/Accueil";
-import PageEDT from "./pages/EDT";
-import PageAnnonces from "./pages/Annonces";
-import PageRessources from "./pages/Ressources";
-import PageSocial from "./pages/Social";
-import PageAlumni from "./pages/Alumni";
 import PageProfil from "./pages/Profil";
-import PageAide from "./pages/Aide";
-import PageAdmin from "./pages/Admin";
-import PageNotifications from "./pages/Notifications";
+import { ProfilExterne } from "./pages/Profil";
 import { useNotifs } from "./hooks/useFirestore";
 import GlobalSearch from "./components/GlobalSearch";
-import { ProfilExterne } from "./pages/Profil";
+
+const Accueil          = lazy(() => import("./pages/Accueil"));
+const PageEDT          = lazy(() => import("./pages/EDT"));
+const PageAnnonces     = lazy(() => import("./pages/Annonces"));
+const PageRessources   = lazy(() => import("./pages/Ressources"));
+const PageSocial       = lazy(() => import("./pages/Social"));
+const PageAlumni       = lazy(() => import("./pages/Alumni"));
+const PageAide         = lazy(() => import("./pages/Aide"));
+const PageAdmin        = lazy(() => import("./pages/Admin"));
+const PageNotifications = lazy(() => import("./pages/Notifications"));
+const PageTrombinoscope = lazy(() => import("./pages/Trombinoscope"));
 
 const SUPER_MODES = [
   { id:"control",        icon:"🎛",  label:"Contrôle",       color:"#dc2626", bg:"#fef2f2" },
@@ -39,21 +41,21 @@ const NAV_BY_ROLE = {
 };
 
 const MORE_BY_ROLE = {
-  etudiant:       [["social","💬","Espace Social"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
-  enseignant:     [["social","💬","Communauté"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
-  alumni:         [["profil","👤","Mon Profil"],["social","💬","Social"],["aide","❓","Aide"]],
-  administration: [["social","💬","Social"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
-  superadmin:     [["admin","⚙️","Admin"],["profil","👤","Mon Profil"]],
+  etudiant:       [["social","💬","Espace Social"],["trombinoscope","👥","Trombinoscope"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
+  enseignant:     [["social","💬","Communauté"],["trombinoscope","👥","Trombinoscope"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
+  alumni:         [["trombinoscope","👥","Trombinoscope"],["profil","👤","Mon Profil"],["social","💬","Social"],["aide","❓","Aide"]],
+  administration: [["trombinoscope","👥","Trombinoscope"],["social","💬","Social"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
+  superadmin:     [["trombinoscope","👥","Trombinoscope"],["admin","⚙️","Admin"],["profil","👤","Mon Profil"]],
   control:        [["profil","👤","Mon Profil"]],
   support:        [["profil","👤","Mon Profil"]],
 };
 
 const DESKTOP_NAV_BY_ROLE = {
-  etudiant:       [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["social","💬 Social"],["alumni","🎓 Alumni"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  enseignant:     [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Mes cours"],["social","💬 Communauté"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  alumni:         [["accueil","🏠 Accueil"],["alumni","🎓 Espace Alumni"],["annonces","📢 Annonces"],["social","💬 Social"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  administration: [["accueil","🏠 Accueil"],["annonces","📢 Annonces"],["edt","📅 EDT"],["ressources","📚 Ressources"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  superadmin:     [["accueil","🏠 Accueil"],["admin","⚙️ Admin"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["profil","👤 Profil"]],
+  etudiant:       [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["social","💬 Social"],["trombinoscope","👥 Trombi"],["alumni","🎓 Alumni"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  enseignant:     [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Mes cours"],["social","💬 Communauté"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  alumni:         [["accueil","🏠 Accueil"],["alumni","🎓 Espace Alumni"],["annonces","📢 Annonces"],["social","💬 Social"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  administration: [["accueil","🏠 Accueil"],["annonces","📢 Annonces"],["edt","📅 EDT"],["ressources","📚 Ressources"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  superadmin:     [["accueil","🏠 Accueil"],["admin","⚙️ Admin"],["trombinoscope","👥 Trombi"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["profil","👤 Profil"]],
   control:        [["admin","🎛 Centre de Contrôle"],["profil","👤 Profil"]],
   support:        [["admin","🎫 Centre de Support"],["profil","👤 Profil"]],
 };
@@ -62,7 +64,7 @@ const PAGE_TITLES = {
   accueil:"Accueil", edt:"Emploi du temps", annonces:"Annonces",
   ressources:"Ressources", social:"Social", alumni:"Alumni",
   profil:"Mon Profil", aide:"Aide & Support", admin:"Administration",
-  notifications:"Notifications",
+  notifications:"Notifications", trombinoscope:"Trombinoscope",
 };
 
 export default function App() {
@@ -133,17 +135,20 @@ export default function App() {
 
   const goToReseau = () => { setSocialTab("reseau"); setPageState("social"); setDrawer(false); };
 
+  const SuspenseFallback = <div style={{ padding:40, textAlign:"center", color:C.muted }}>Chargement…</div>;
+
   const PAGE = {
-    accueil:    <Accueil      setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} onGoToReseau={goToReseau} />,
-    edt:        <PageEDT      profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    annonces:   <PageAnnonces profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    ressources: <PageRessources profile={{...profile, role:effectiveRole}} setPage={goTo} />,
-    social:     <PageSocial   profile={{...profile, role:effectiveRole}} setPage={goTo} initialTab={socialTab} />,
-    alumni:     <PageAlumni   profile={{...profile, role:effectiveRole}} setPage={goTo} />,
+    accueil:    <Suspense fallback={SuspenseFallback}><Accueil      setPage={goTo} isMobile={isMobile} profile={{...profile, role:effectiveRole}} onGoToReseau={goToReseau} /></Suspense>,
+    edt:        <Suspense fallback={SuspenseFallback}><PageEDT      profile={{...profile, role:effectiveRole}} setPage={goTo} /></Suspense>,
+    annonces:   <Suspense fallback={SuspenseFallback}><PageAnnonces profile={{...profile, role:effectiveRole}} setPage={goTo} /></Suspense>,
+    ressources: <Suspense fallback={SuspenseFallback}><PageRessources profile={{...profile, role:effectiveRole}} setPage={goTo} /></Suspense>,
+    social:     <Suspense fallback={SuspenseFallback}><PageSocial   profile={{...profile, role:effectiveRole}} setPage={goTo} initialTab={socialTab} /></Suspense>,
+    alumni:     <Suspense fallback={SuspenseFallback}><PageAlumni   profile={{...profile, role:effectiveRole}} setPage={goTo} /></Suspense>,
     profil:     <PageProfil   profile={profile} onLogout={()=>setConfirmLogout(true)} setPage={goTo} />,
-    aide:       <PageAide     profile={profile} setPage={goTo} />,
-    admin:         <PageAdmin         profile={profile} activeMode={activeMode||"control"} setPage={goTo} />,
-    notifications: <PageNotifications profile={profile} onGoTo={goTo} />,
+    aide:       <Suspense fallback={SuspenseFallback}><PageAide     profile={profile} setPage={goTo} /></Suspense>,
+    admin:         <Suspense fallback={SuspenseFallback}><PageAdmin         profile={profile} activeMode={activeMode||"control"} setPage={goTo} /></Suspense>,
+    notifications: <Suspense fallback={SuspenseFallback}><PageNotifications profile={profile} onGoTo={goTo} /></Suspense>,
+    trombinoscope: <Suspense fallback={SuspenseFallback}><PageTrombinoscope /></Suspense>,
   };
 
   const ModeSelectorBar = () => (

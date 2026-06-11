@@ -151,6 +151,7 @@ export default function Login() {
   const [waNum, setWaNum]           = useState("");
   const [waSame, setWaSame]         = useState(true);
   const [showRegPwd, setShowRegPwd] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const roleInfo    = ROLES.find(r => r.id === regRole) || {};
   const pwdStrength = useMemo(() => getPwdStrength(password), [password]);
@@ -538,12 +539,24 @@ export default function Login() {
                     )}
                   </div>
                 </div>
-                <button onClick={handleRegister} disabled={loading} style={{
+                {/* Charte de confidentialité */}
+                <label style={{ display:"flex", alignItems:"flex-start", gap:10, cursor:"pointer", marginBottom:16, padding:"10px 12px", background:C.surfaceAlt, borderRadius:10, border:`1px solid ${acceptedTerms?C.blueBorder:C.border}` }}>
+                  <div onClick={()=>setAcceptedTerms(!acceptedTerms)} style={{ width:20, height:20, borderRadius:5, border:`2px solid ${acceptedTerms?C.blue:C.border}`, background:acceptedTerms?C.blue:"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1, transition:"all 0.15s", cursor:"pointer" }}>
+                    {acceptedTerms && <span style={{ color:"#fff", fontSize:"0.7rem", fontWeight:900 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize:"0.77rem", color:C.dark, lineHeight:1.55 }}>
+                    J'accepte la{" "}
+                    <strong style={{ color:C.blue }}>politique de confidentialité</strong>{" "}
+                    d'ARSTM Campus. Mes données sont traitées conformément au RGPD et uniquement dans le cadre de la gestion de la plateforme scolaire.
+                  </span>
+                </label>
+
+                <button onClick={handleRegister} disabled={loading || !acceptedTerms} style={{
                   width:"100%", padding:"13px", borderRadius:12, border:"none",
-                  background: loading ? "#94a3b8" : `linear-gradient(135deg,${roleInfo.color||C.blue},${C.blue})`,
+                  background: (loading || !acceptedTerms) ? "#94a3b8" : `linear-gradient(135deg,${roleInfo.color||C.blue},${C.blue})`,
                   color:"#fff", fontFamily:"inherit", fontWeight:700, fontSize:"0.9rem",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: loading ? "none" : `0 4px 16px ${roleInfo.color||C.blue}40`,
+                  cursor: (loading || !acceptedTerms) ? "not-allowed" : "pointer",
+                  boxShadow: (loading || !acceptedTerms) ? "none" : `0 4px 16px ${roleInfo.color||C.blue}40`,
                   transition:"all 0.2s",
                 }}>
                   {loading ? "Création en cours…" : "Créer mon compte →"}

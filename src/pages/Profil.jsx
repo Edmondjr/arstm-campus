@@ -95,6 +95,82 @@ export function ProfilExterne({ user, onClose, onMessage }) {
   );
 }
 
+// ─── Constantes filières / indicatifs (module scope) ──────────────────────────
+const ECOLES   = ["ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"];
+const CODES    = ["+225","+223","+226","+228","+229","+221","+237","+243","+33","+1","+44"];
+const FILIERES_ETUDIANT = [
+  { group:"LPTML", opts:["LPTML - 1ère Année","LPTML - Port Manutention 2e Année","LPTML - Port Manutention 3e Année","LPTML - Transit Consignation et Armement 2e Année","LPTML - Transit Consignation et Armement 3e Année","LPTML - Transport Multimodal 2e Année","LPTML - Transport Multimodal 3e Année"] },
+  { group:"MPTML", opts:["MPTML - Gestion Portuaire et Maritime 1ère Année","MPTML - Gestion Portuaire et Maritime 2e Année","MPTML - Logistique et Transport 1ère Année","MPTML - Logistique et Transport 2e Année"] },
+  { group:"Sciences Nautiques", opts:["LPSN – Sciences Nautiques 1ère Année","LPSN – Sciences Nautiques 2e Année","LPSN – Sciences Nautiques 3e Année","MPSN – Capitaine au long cours","PC 750","CHEF DE QUART","ELEVE CHEF DE QUART"] },
+  { group:"Mécanique Navale", opts:["LPMN – Mécanique Navale 1ère Année","LPMN – Mécanique Navale 2e Année","LPMN – Mécanique Navale 3e Année","MPMN – Officier Mécanicien 1ère Classe","MPMN – Officier Mécanicien 2e Classe"] },
+  { group:"Génie Thermique", opts:["LPGT – Génie Thermique 1ère Année","LPGT – Génie Thermique 2e Année","LPGT – Génie Thermique 3e Année"] },
+  { group:"Réseau Informatique", opts:["LPRIT – Réseau Informatique et Télécom 1ère Année","LPRIT – Réseau Informatique et Télécom 2e Année","LPRIT – Réseau Informatique et Télécom 3e Année"] },
+  { group:"Autres", opts:["CEAM – Matelot Polyvalent","FOAD","Formation Continue"] },
+];
+const FILIERES_ALUMNI = ["LPTML - Port Manutention","LPTML - Transit Consignation et Armement","LPTML - Transport Multimodal","MPTML - Gestion Portuaire et Maritime","MPTML - Logistique et Transport","Sciences Nautiques","Capitaine au long cours","Mécanique Navale","Officier Mécanicien","Génie Thermique","Réseau Informatique et Télécom","CEAM","FOAD","Formation Continue","Autre"];
+
+// ─── ProfilRoleFields (module scope — évite le remontage à chaque re-render) ──
+function ProfilRoleFields({ role, editMode, profile,
+  editFiliere, setEditFiliere, editPromo, setEditPromo,
+  editModules, setEditModules, editEcoles, setEditEcoles, editEcoleAutre, setEditEcoleAutre,
+  editEmployeur, setEditEmployeur, editPoste, setEditPoste,
+  editService, setEditService }) {
+  if (!editMode) {
+    if (role==="etudiant") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Filière" val={profile?.filiere||"—"}/><Field label="Promotion" val={profile?.promo||"—"}/></div>);
+    if (role==="enseignant") return(<div><Field label="Modules" val={profile?.modules||"—"}/>{profile?.ecoles?.length>0&&<div style={{marginTop:10}}><span style={css.label}>Écoles / Centres</span><div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>{profile.ecoles.map(e=><span key={e} style={css.tag(C.greenLight,C.green)}>{e}</span>)}{profile?.ecoleAutre&&<span style={css.tag(C.blueLight,C.blue)}>{profile.ecoleAutre}</span>}</div></div>}</div>);
+    if (role==="alumni") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Filière sortie" val={profile?.filiere||"—"}/><Field label="Promotion" val={profile?.promo||"—"}/><Field label="Employeur" val={profile?.employeur||"—"}/><Field label="Poste" val={profile?.poste||"—"}/></div>);
+    if (role==="administration") return <Field label="Service / Direction" val={profile?.service||profile?.promo||"—"}/>;
+    if (role==="superadmin") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Rôle" val="Admin Plateforme"/><Field label="Accès" val="Complet" highlight/><Field label="Plateforme" val="ARSTM Campus"/><Field label="Organisation" val="ARSTM"/></div>);
+    return null;
+  }
+  if (role==="enseignant") return(
+    <div>
+      <div style={{marginBottom:10}}><span style={css.label}>Modules enseignés</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: Droit Maritime..." value={editModules} onChange={e=>setEditModules(e.target.value)}/></div>
+      <div style={{marginBottom:10}}>
+        <span style={css.label}>École(s) / Centre(s)</span>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>{ECOLES.map(e=><button key={e} onClick={()=>setEditEcoles(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e])} style={{padding:"5px 10px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:"0.78rem",fontWeight:600,border:"none",background:editEcoles.includes(e)?C.green:"#e2e8f0",color:editEcoles.includes(e)?"#fff":"#475569",transition:"all 0.15s"}}>{e}</button>)}</div>
+        <input style={{...css.input,background:C.surfaceAlt}} placeholder="Autre..." value={editEcoleAutre} onChange={e=>setEditEcoleAutre(e.target.value)}/>
+      </div>
+    </div>
+  );
+  if (role==="etudiant") return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+      <div><span style={css.label}>Filière</span>
+        <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
+          <option value="">Sélectionner votre filière...</option>
+          {FILIERES_ETUDIANT.map(g=>(<optgroup key={g.group} label={g.group}>{g.opts.map(o=><option key={o} value={o}>{o}</option>)}</optgroup>))}
+        </select>
+      </div>
+      <div><span style={css.label}>Promotion (année d'entrée)</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2024" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/></div>
+    </div>
+  );
+  if (role==="alumni") return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+      <div><span style={css.label}>Filière (formation suivie)</span>
+        <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
+          <option value="">Sélectionner votre filière...</option>
+          {FILIERES_ALUMNI.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div><span style={css.label}>Promotion</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2020" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/></div>
+        <div><span style={css.label}>Employeur</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Entreprise" value={editEmployeur} onChange={e=>setEditEmployeur(e.target.value)}/></div>
+      </div>
+      <div><span style={css.label}>Poste</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Poste" value={editPoste} onChange={e=>setEditPoste(e.target.value)}/></div>
+    </div>
+  );
+  if (role==="administration") return(
+    <div style={{marginBottom:10}}>
+      <span style={css.label}>Service / Direction</span>
+      <select style={{...css.input,background:C.surfaceAlt}} value={editService} onChange={e=>setEditService(e.target.value)}>
+        <option value="">Sélectionner...</option>
+        {["Direction Générale","Direction Académique","Scolarité","Comptabilité et Finances","Communication et Marketing","Relations Extérieures","Ressources Humaines","ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"].map(s=><option key={s}>{s}</option>)}
+      </select>
+    </div>
+  );
+  return null;
+}
+
 // ─── Page Mon Profil ──────────────────────────────────────────────────────────
 export default function PageProfil({ profile, onLogout, setPage }) {
   const authCtx = useAuth();
@@ -152,18 +228,6 @@ export default function PageProfil({ profile, onLogout, setPage }) {
 
   const roleInfo = ROLES.find(r=>r.id===profile?.role)||ROLES[0];
   const initials = profile?.avatar||profile?.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
-  const ECOLES   = ["ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"];
-  const CODES    = ["+225","+223","+226","+228","+229","+221","+237","+243","+33","+1","+44"];
-  const FILIERES_ETUDIANT = [
-    { group:"LPTML", opts:["LPTML - 1ère Année","LPTML - Port Manutention 2e Année","LPTML - Port Manutention 3e Année","LPTML - Transit Consignation et Armement 2e Année","LPTML - Transit Consignation et Armement 3e Année","LPTML - Transport Multimodal 2e Année","LPTML - Transport Multimodal 3e Année"] },
-    { group:"MPTML", opts:["MPTML - Gestion Portuaire et Maritime 1ère Année","MPTML - Gestion Portuaire et Maritime 2e Année","MPTML - Logistique et Transport 1ère Année","MPTML - Logistique et Transport 2e Année"] },
-    { group:"Sciences Nautiques", opts:["LPSN – Sciences Nautiques 1ère Année","LPSN – Sciences Nautiques 2e Année","LPSN – Sciences Nautiques 3e Année","MPSN – Capitaine au long cours","PC 750","CHEF DE QUART","ELEVE CHEF DE QUART"] },
-    { group:"Mécanique Navale", opts:["LPMN – Mécanique Navale 1ère Année","LPMN – Mécanique Navale 2e Année","LPMN – Mécanique Navale 3e Année","MPMN – Officier Mécanicien 1ère Classe","MPMN – Officier Mécanicien 2e Classe"] },
-    { group:"Génie Thermique", opts:["LPGT – Génie Thermique 1ère Année","LPGT – Génie Thermique 2e Année","LPGT – Génie Thermique 3e Année"] },
-    { group:"Réseau Informatique", opts:["LPRIT – Réseau Informatique et Télécom 1ère Année","LPRIT – Réseau Informatique et Télécom 2e Année","LPRIT – Réseau Informatique et Télécom 3e Année"] },
-    { group:"Autres", opts:["CEAM – Matelot Polyvalent","FOAD","Formation Continue"] },
-  ];
-  const FILIERES_ALUMNI = ["LPTML - Port Manutention","LPTML - Transit Consignation et Armement","LPTML - Transport Multimodal","MPTML - Gestion Portuaire et Maritime","MPTML - Logistique et Transport","Sciences Nautiques","Capitaine au long cours","Mécanique Navale","Officier Mécanicien","Génie Thermique","Réseau Informatique et Télécom","CEAM","FOAD","Formation Continue","Autre"];
 
   const handlePhotoUpload = async(e)=>{
     const file=e.target.files[0]; if(!file) return;
@@ -250,73 +314,6 @@ export default function PageProfil({ profile, onLogout, setPage }) {
     superadmin:    [{icon:"👥",label:"Utilisateurs",val:"—",page:"admin"},{icon:"🛡",label:"Accès total",val:"✓",page:"admin"}],
   }[profile?.role]||[];
 
-  const RoleFields=()=>{
-    if(!editMode){
-      if(profile?.role==="etudiant") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Filière" val={profile?.filiere||"—"}/><Field label="Promotion" val={profile?.promo||"—"}/></div>);
-      if(profile?.role==="enseignant") return(<div><Field label="Modules" val={profile?.modules||"—"}/>{profile?.ecoles?.length>0&&<div style={{marginTop:10}}><span style={css.label}>Écoles / Centres</span><div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>{profile.ecoles.map(e=><span key={e} style={css.tag(C.greenLight,C.green)}>{e}</span>)}{profile?.ecoleAutre&&<span style={css.tag(C.blueLight,C.blue)}>{profile.ecoleAutre}</span>}</div></div>}</div>);
-      if(profile?.role==="alumni") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Filière sortie" val={profile?.filiere||"—"}/><Field label="Promotion" val={profile?.promo||"—"}/><Field label="Employeur" val={profile?.employeur||"—"}/><Field label="Poste" val={profile?.poste||"—"}/></div>);
-      if(profile?.role==="administration") return <Field label="Service / Direction" val={profile?.service||profile?.promo||"—"}/>;
-      if(profile?.role==="superadmin") return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="Rôle" val="Admin Plateforme"/><Field label="Accès" val="Complet" highlight/><Field label="Plateforme" val="ARSTM Campus"/><Field label="Organisation" val="ARSTM"/></div>);
-      return null;
-    }
-    if(profile?.role==="enseignant") return(
-      <div>
-        <div style={{marginBottom:10}}><span style={css.label}>Modules enseignés</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: Droit Maritime..." value={editModules} onChange={e=>setEditModules(e.target.value)}/></div>
-        <div style={{marginBottom:10}}>
-          <span style={css.label}>École(s) / Centre(s)</span>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-            {ECOLES.map(e=><button key={e} onClick={()=>setEditEcoles(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e])} style={{padding:"5px 10px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:"0.78rem",fontWeight:600,border:"none",background:editEcoles.includes(e)?C.green:"#e2e8f0",color:editEcoles.includes(e)?"#fff":"#475569",transition:"all 0.15s"}}>{e}</button>)}
-          </div>
-          <input style={{...css.input,background:C.surfaceAlt}} placeholder="Autre..." value={editEcoleAutre} onChange={e=>setEditEcoleAutre(e.target.value)}/>
-        </div>
-      </div>
-    );
-    if(profile?.role==="etudiant") return(
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
-        <div>
-          <span style={css.label}>Filière</span>
-          <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
-            <option value="">Sélectionner votre filière...</option>
-            {FILIERES_ETUDIANT.map(g=>(
-              <optgroup key={g.group} label={g.group}>
-                {g.opts.map(o=><option key={o} value={o}>{o}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <div>
-          <span style={css.label}>Promotion (année d'entrée)</span>
-          <input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2024" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/>
-        </div>
-      </div>
-    );
-    if(profile?.role==="alumni") return(
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
-        <div>
-          <span style={css.label}>Filière (formation suivie)</span>
-          <select style={{...css.input,background:C.surfaceAlt}} value={editFiliere} onChange={e=>setEditFiliere(e.target.value)}>
-            <option value="">Sélectionner votre filière...</option>
-            {FILIERES_ALUMNI.map(o=><option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <div><span style={css.label}>Promotion</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Ex: 2020" value={editPromo} onChange={e=>setEditPromo(e.target.value)}/></div>
-          <div><span style={css.label}>Employeur</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Entreprise" value={editEmployeur} onChange={e=>setEditEmployeur(e.target.value)}/></div>
-        </div>
-        <div><span style={css.label}>Poste</span><input style={{...css.input,background:C.surfaceAlt}} placeholder="Poste" value={editPoste} onChange={e=>setEditPoste(e.target.value)}/></div>
-      </div>
-    );
-    if(profile?.role==="administration") return(
-      <div style={{marginBottom:10}}>
-        <span style={css.label}>Service / Direction</span>
-        <select style={{...css.input,background:C.surfaceAlt}} value={editService} onChange={e=>setEditService(e.target.value)}>
-          <option value="">Sélectionner...</option>
-          {["Direction Générale","Direction Académique","Scolarité","Comptabilité et Finances","Communication et Marketing","Relations Extérieures","Ressources Humaines","ESTM","ESN","CEAM","ISMI","CREMPOL","FOAD"].map(s=><option key={s}>{s}</option>)}
-        </select>
-      </div>
-    );
-    return null;
-  };
 
   return (
     <div style={{maxWidth:640,margin:"0 auto",paddingBottom:32}}>
@@ -410,7 +407,15 @@ export default function PageProfil({ profile, onLogout, setPage }) {
           {/* Infos rôle */}
           <Card>
             <span style={css.label}>Informations</span>
-            <RoleFields/>
+            <ProfilRoleFields role={profile?.role} editMode={editMode} profile={profile}
+              editFiliere={editFiliere} setEditFiliere={setEditFiliere}
+              editPromo={editPromo} setEditPromo={setEditPromo}
+              editModules={editModules} setEditModules={setEditModules}
+              editEcoles={editEcoles} setEditEcoles={setEditEcoles}
+              editEcoleAutre={editEcoleAutre} setEditEcoleAutre={setEditEcoleAutre}
+              editEmployeur={editEmployeur} setEditEmployeur={setEditEmployeur}
+              editPoste={editPoste} setEditPoste={setEditPoste}
+              editService={editService} setEditService={setEditService}/>
           </Card>
 
           {/* Contact */}

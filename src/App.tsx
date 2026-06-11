@@ -41,22 +41,22 @@ const NAV_BY_ROLE = {
 };
 
 const MORE_BY_ROLE = {
-  etudiant:       [["social","💬","Espace Social"],["trombinoscope","👥","Trombinoscope"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
-  enseignant:     [["social","💬","Communauté"],["trombinoscope","👥","Trombinoscope"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
-  alumni:         [["trombinoscope","👥","Trombinoscope"],["profil","👤","Mon Profil"],["social","💬","Social"],["aide","❓","Aide"]],
+  etudiant:       [["social","💬","Espace Social"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
+  enseignant:     [["social","💬","Communauté"],["alumni","🎓","Espace Alumni"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
+  alumni:         [["profil","👤","Mon Profil"],["social","💬","Social"],["aide","❓","Aide"]],
   administration: [["trombinoscope","👥","Trombinoscope"],["social","💬","Social"],["profil","👤","Mon Profil"],["aide","❓","Aide"]],
   superadmin:     [["trombinoscope","👥","Trombinoscope"],["admin","⚙️","Admin"],["profil","👤","Mon Profil"]],
-  control:        [["profil","👤","Mon Profil"]],
+  control:        [["trombinoscope","👥","Trombinoscope"],["profil","👤","Mon Profil"]],
   support:        [["profil","👤","Mon Profil"]],
 };
 
 const DESKTOP_NAV_BY_ROLE = {
-  etudiant:       [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["social","💬 Social"],["trombinoscope","👥 Trombi"],["alumni","🎓 Alumni"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  enseignant:     [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Mes cours"],["social","💬 Communauté"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
-  alumni:         [["accueil","🏠 Accueil"],["alumni","🎓 Espace Alumni"],["annonces","📢 Annonces"],["social","💬 Social"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  etudiant:       [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["social","💬 Social"],["alumni","🎓 Alumni"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  enseignant:     [["accueil","🏠 Accueil"],["edt","📅 Planning"],["annonces","📢 Annonces"],["ressources","📚 Mes cours"],["social","💬 Communauté"],["profil","👤 Profil"],["aide","❓ Aide"]],
+  alumni:         [["accueil","🏠 Accueil"],["alumni","🎓 Espace Alumni"],["annonces","📢 Annonces"],["social","💬 Social"],["profil","👤 Profil"],["aide","❓ Aide"]],
   administration: [["accueil","🏠 Accueil"],["annonces","📢 Annonces"],["edt","📅 EDT"],["ressources","📚 Ressources"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"],["aide","❓ Aide"]],
   superadmin:     [["accueil","🏠 Accueil"],["admin","⚙️ Admin"],["trombinoscope","👥 Trombi"],["annonces","📢 Annonces"],["ressources","📚 Ressources"],["profil","👤 Profil"]],
-  control:        [["admin","🎛 Centre de Contrôle"],["profil","👤 Profil"]],
+  control:        [["admin","🎛 Centre de Contrôle"],["trombinoscope","👥 Trombi"],["profil","👤 Profil"]],
   support:        [["admin","🎫 Centre de Support"],["profil","👤 Profil"]],
 };
 

@@ -3,6 +3,7 @@ import { useAuth } from "../AuthContext";
 import { C, ROLES, GRADIENTS, css } from "../design";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebase";
+import PrivacyPolicyModal from "./PrivacyPolicy";
 
 const CODES = [
   {code:"+225",flag:"🇨🇮"},{code:"+223",flag:"🇲🇱"},{code:"+226",flag:"🇧🇫"},
@@ -152,6 +153,7 @@ export default function Login() {
   const [waSame, setWaSame]         = useState(true);
   const [showRegPwd, setShowRegPwd] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy]     = useState(false);
 
   const roleInfo    = ROLES.find(r => r.id === regRole) || {};
   const pwdStrength = useMemo(() => getPwdStrength(password), [password]);
@@ -357,7 +359,13 @@ export default function Login() {
   return (
     <div style={{ position:"fixed", inset:0, background: GRADIENTS.login, overflowY:"auto" }}>
     <div style={{ minHeight:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-start", padding:"24px 16px 40px" }}>
-      {showReset && <ResetModal onClose={() => setShowReset(false)} />}
+      {showReset   && <ResetModal onClose={() => setShowReset(false)} />}
+      {showPrivacy && (
+        <PrivacyPolicyModal
+          onClose={() => setShowPrivacy(false)}
+          onAccept={() => setAcceptedTerms(true)}
+        />
+      )}
 
       {/* Decorative orbs */}
       <div style={{ position:"fixed", top:-100, right:-100, width:340, height:340, borderRadius:"50%", background:"rgba(37,99,235,0.07)", pointerEvents:"none" }} />
@@ -545,9 +553,11 @@ export default function Login() {
                     {acceptedTerms && <span style={{ color:"#fff", fontSize:"0.7rem", fontWeight:900 }}>✓</span>}
                   </div>
                   <span style={{ fontSize:"0.77rem", color:C.dark, lineHeight:1.55 }}>
-                    J'accepte la{" "}
-                    <strong style={{ color:C.blue }}>politique de confidentialité</strong>{" "}
-                    d'ARSTM Campus. Mes données sont traitées conformément au RGPD et uniquement dans le cadre de la gestion de la plateforme scolaire.
+                    J'ai lu et j'accepte la{" "}
+                    <button type="button" onClick={e => { e.stopPropagation(); setShowPrivacy(true); }} style={{ background:"none", border:"none", padding:0, cursor:"pointer", color:C.blue, fontWeight:700, fontFamily:"inherit", fontSize:"inherit", textDecoration:"underline" }}>
+                      politique de confidentialité
+                    </button>{" "}
+                    d'ARSTM Campus. Mes données sont traitées conformément à la Loi n°2013-450 de Côte d'Ivoire et uniquement dans le cadre de la gestion de la plateforme scolaire.
                   </span>
                 </label>
 

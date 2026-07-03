@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { C, ROLES, css } from "../design";
 import {
-  useUsers, approveUser, rejectUser, useCollection,
+  useUsers, approveUser, rejectUser, useCollection, useGroups,
   updateDocument, deleteDocument, seedDemoData, sendNotif
 } from "../hooks/useFirestore";
 import {
@@ -203,8 +203,9 @@ function TicketCard({ t, onAssign, onClose, onReply }) {
 
 // ── CentreControle (module scope, état local pour les filtres/onglets) ──
 function CentreControle({ pending, posts, annonces, allUsers, onlineUsers, openTickets, urgentTickets,
-  activity, changeRequests, handleApprove, handleReject, handleBlock, handleUnblock, handleDelete,
-  changeRole, warnUser, handleSeed, deletePost, deleteAnnonce, approveChangeReq, rejectChangeReq }) {
+  activity, changeRequests, groups, handleApprove, handleReject, handleBlock, handleUnblock, handleDelete,
+  changeRole, warnUser, handleSeed, deletePost, deleteAnnonce, approveChangeReq, rejectChangeReq,
+  deleteGroup, warnGroupCreator }) {
 
   const [tab, setTab]                 = useState("dashboard");
   const [search, setSearch]           = useState("");
@@ -230,6 +231,7 @@ function CentreControle({ pending, posts, annonces, allUsers, onlineUsers, openT
     ["pending",`⏳ En attente${pending.length>0?` (${pending.length})`:""}`],
     ["demandes",`📋 Demandes${pendingChanges.length>0?` (${pendingChanges.length})`:""}`],
     ["content","🛡 Contenu"],
+    ["groupes",`💬 Groupes${groups?.length>0?` (${groups.length})`:""}`],
     ["data","🌱 Données"],
   ];
 
@@ -254,6 +256,7 @@ function CentreControle({ pending, posts, annonces, allUsers, onlineUsers, openT
           [openTickets.length,"Tickets ouverts","🎫",C.red,C.redLight],
           [posts.length,"Posts publiés","💬",C.purple,C.purpleLight],
           [annonces.length,"Annonces actives","📢",C.aqua,C.aquaLight],
+          [groups?.length||0,"Groupes actifs","💬",C.navy,"#f1f5f9"],
         ].map(([v,l,icon,color,bg],i)=>(
           <div key={i} style={{...css.cardSm,display:"flex",alignItems:"center",gap:12,background:bg,border:`1px solid ${color}22`}}>
             <div style={{fontSize:"1.3rem"}}>{icon}</div>
@@ -447,6 +450,52 @@ function CentreControle({ pending, posts, annonces, allUsers, onlineUsers, openT
         </div>
       )}
 
+      {/* Groupes */}
+      {tab==="groupes"&&(
+        <div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:12}}>💬 Groupes — {groups?.length||0} actifs</div>
+          {(!groups||groups.length===0)?(
+            <div style={{...css.card,textAlign:"center",padding:40,color:C.muted}}>
+              <div style={{fontSize:"2rem",marginBottom:8}}>💬</div>
+              Aucun groupe créé pour l'instant.
+            </div>
+          ):groups.map(g=>{
+            const creatorUser = allUsers.find(u=>u.uid===g.createdBy||u.id===g.createdBy);
+            return (
+              <div key={g.id} style={{...css.card,marginBottom:10,padding:14}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                  <div style={{width:46,height:46,borderRadius:12,background:`${g.color||C.blue}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0,border:`2px solid ${g.color||C.blue}30`}}>
+                    {g.icon||"💬"}
+                  </div>
+                  <div style={{flex:1,minWidth:140}}>
+                    <div style={{fontWeight:700,color:C.navy,fontSize:"0.9rem",marginBottom:3}}>{g.name}</div>
+                    {g.description&&<div style={{fontSize:"0.77rem",color:C.mid,marginBottom:4}}>{g.description}</div>}
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                      <span style={{fontSize:"0.73rem",color:C.muted}}>👥 {g.members?.length||0} membres</span>
+                      {creatorUser&&<span style={{...css.badge(C.blueLight,C.blue),fontSize:"0.7rem"}}>Créé par {creatorUser.name||g.createdBy}</span>}
+                      {g.waGroupLink&&<span style={{...css.badge("#f0fdf4","#059669"),fontSize:"0.7rem"}}>📱 WA lié</span>}
+                      {g.createdAt?.toDate&&<span style={{fontSize:"0.7rem",color:C.muted}}>le {g.createdAt.toDate().toLocaleDateString("fr-FR")}</span>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"flex-start"}}>
+                    {g.createdBy&&(
+                      <button style={{...css.btnSm,background:C.goldLight,color:C.gold,border:`1px solid ${C.goldBorder}`,fontSize:"0.74rem"}}
+                        onClick={()=>warnGroupCreator(g.createdBy,g.name,allUsers)}>
+                        ⚠️ Avertir créateur
+                      </button>
+                    )}
+                    <button style={{...css.btnDanger,fontSize:"0.74rem",padding:"5px 10px"}}
+                      onClick={()=>deleteGroup(g.id,g.name)}>
+                      🗑 Supprimer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Données */}
       {tab==="data"&&(
         <div style={css.card}>
@@ -549,6 +598,7 @@ export default function PageAdmin({ profile, activeMode = "control" }) {
   const { data: posts }          = useCollection("posts");
   const { data: annonces }       = useCollection("annonces");
   const { data: changeRequests } = useCollection("changeRequests");
+  const { data: groups }         = useGroups();
   const allTickets  = useTicketsRT();
   const onlineUsers = useOnlineUsers();
   const activity    = useActivityRT();
@@ -593,6 +643,20 @@ export default function PageAdmin({ profile, activeMode = "control" }) {
 
   const handleSeed = () => seedDemoData();
 
+  // ── Actions groupes ──
+  const deleteGroup = async (id, name) => {
+    if (!window.confirm(`Supprimer le groupe "${name}" ? Cette action est irréversible.`)) return;
+    await deleteDocument("groups", id);
+  };
+  const warnGroupCreator = async (creatorUid, groupName, users) => {
+    const creator = users.find(u => u.uid === creatorUid || u.id === creatorUid);
+    const creatorName = creator?.name || "le créateur";
+    if (!window.confirm(`Envoyer un avertissement à ${creatorName} pour le groupe "${groupName}" ?`)) return;
+    await updateDocument("users", creatorUid, { warned: true, warnedBy: profile?.name, warnedAt: serverTimestamp() });
+    await sendNotif(creatorUid, { type: "avertissement", fromName: "Administration ARSTM", fromAvatar: "⚠️", message: `Votre groupe "${groupName}" a été signalé par l'administration.` });
+    alert(`Avertissement envoyé à ${creatorName}.`);
+  };
+
   if (activeMode === "support") return (
     <CentreSupport
       allTickets={allTickets} openTickets={openTickets} progressTickets={progressTickets}
@@ -608,12 +672,14 @@ export default function PageAdmin({ profile, activeMode = "control" }) {
       allUsers={allUsers} onlineUsers={onlineUsers}
       openTickets={openTickets} urgentTickets={urgentTickets}
       activity={activity} changeRequests={changeRequests}
+      groups={groups}
       handleApprove={handleApprove} handleReject={handleReject}
       handleBlock={handleBlock} handleUnblock={handleUnblock}
       handleDelete={handleDelete} changeRole={changeRole}
       warnUser={warnUser} handleSeed={handleSeed}
       deletePost={deletePost} deleteAnnonce={deleteAnnonce}
       approveChangeReq={approveChangeReq} rejectChangeReq={rejectChangeReq}
+      deleteGroup={deleteGroup} warnGroupCreator={warnGroupCreator}
     />
   );
 }

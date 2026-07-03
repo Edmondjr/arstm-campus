@@ -3,9 +3,11 @@ import { useState } from "react";
 import { C, css } from "../design";
 import { addDocument } from "../hooks/useFirestore";
 import { useAuth } from "../AuthContext";
+import PrivacyPolicyModal from "./PrivacyPolicy";
 
 export default function PageAide({ profile }) {
-  const [ouvert, setOuvert] = useState(null);
+  const [ouvert, setOuvert]       = useState(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [ticket, setTicket] = useState({ sujet:"", message:"", priorite:"normale" });
   const [envoye, setEnvoye] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,7 +143,19 @@ export default function PageAide({ profile }) {
         </div>
       )}
 
-      <div style={{ textAlign:"center", marginTop:24, fontSize:"0.75rem", color:C.muted }}>
+      {/* Politique de confidentialité */}
+      {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} />}
+      <div style={{ marginTop:24, padding:"14px 18px", borderRadius:14, background:C.surfaceAlt, border:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div style={{ fontWeight:700, fontSize:"0.85rem", color:C.navy, marginBottom:2 }}>🔒 Politique de Confidentialité</div>
+          <div style={{ fontSize:"0.76rem", color:C.muted }}>Version 1.0 · Loi n°2013-450 de Côte d'Ivoire (ARTCI)</div>
+        </div>
+        <button onClick={() => setShowPrivacy(true)} style={{ ...css.btnSm, borderRadius:20, color:C.blue, border:`1px solid ${C.blueBorder}`, background:C.blueLight, fontWeight:600 }}>
+          Lire la politique →
+        </button>
+      </div>
+
+      <div style={{ textAlign:"center", marginTop:16, fontSize:"0.75rem", color:C.muted }}>
         ARSTM Campus v2.0 · Firebase · 2026
       </div>
     </div>

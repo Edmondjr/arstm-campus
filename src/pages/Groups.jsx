@@ -110,6 +110,77 @@ function GroupChat({ group, profile, onBack }) {
   );
 }
 
+function WaSuccessModal({ group, onClose, onSaveLink }) {
+  const [waLink, setWaLink] = useState("");
+  const [saved, setSaved]   = useState(false);
+
+  const waText = encodeURIComponent(
+    `🎓 *${group.name}* — Groupe ARSTM Campus\n\n` +
+    (group.description ? `${group.description}\n\n` : "") +
+    `Rejoignez notre groupe de discussion sur ARSTM Campus pour rester connectés avec la communauté !\n\nContactez-moi pour rejoindre.`
+  );
+  const waHref = `https://wa.me/?text=${waText}`;
+
+  const handleSave = async () => {
+    if (!waLink.trim().startsWith("https://chat.whatsapp.com/")) return;
+    await onSaveLink(waLink.trim());
+    setSaved(true);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:4000, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} className="modal-enter"
+        style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:440, padding:"28px 22px", boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
+
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <div style={{ width:60, height:60, borderRadius:"50%", background:"#f0fdf4", border:"2px solid #bbf7d0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem", margin:"0 auto 12px" }}>🎉</div>
+          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1.1rem", color:C.navy, marginBottom:4 }}>Groupe créé !</div>
+          <div style={{ fontSize:"0.82rem", color:C.muted }}>
+            <strong style={{ color:C.navy }}>{group.name}</strong> est maintenant visible par tous les membres.
+          </div>
+        </div>
+
+        <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:14, padding:"14px 16px", marginBottom:16 }}>
+          <div style={{ fontWeight:700, color:"#166534", fontSize:"0.85rem", marginBottom:8 }}>📱 Créer aussi le groupe WhatsApp ?</div>
+          <div style={{ fontSize:"0.78rem", color:"#166534", lineHeight:1.6, marginBottom:12 }}>
+            Partagez une invitation WhatsApp avec vos membres, créez le groupe là-bas, puis collez le lien ici pour le lier à votre groupe ARSTM.
+          </div>
+          <a href={waHref} target="_blank" rel="noreferrer"
+            style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"11px 0", borderRadius:10,
+              background:"#25d366", color:"#fff", textDecoration:"none", fontWeight:700, fontSize:"0.86rem", marginBottom:12 }}>
+            <span style={{ fontSize:"1.2rem" }}>💬</span> Envoyer l'invitation sur WhatsApp
+          </a>
+          {!saved ? (
+            <>
+              <div style={{ fontSize:"0.74rem", color:"#166534", marginBottom:6 }}>
+                Une fois votre groupe WhatsApp créé, collez ici le lien d'invitation du groupe (Paramètres → Lien d'invitation) :
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <input style={{ ...css.input, flex:1, fontSize:"0.83rem", background:"#fff" }}
+                  placeholder="https://chat.whatsapp.com/…"
+                  value={waLink} onChange={e => setWaLink(e.target.value)} />
+                <button onClick={handleSave}
+                  disabled={!waLink.trim().startsWith("https://chat.whatsapp.com/")}
+                  style={{ ...css.btnPrimary, background:"#059669", opacity:waLink.trim().startsWith("https://chat.whatsapp.com/")?1:0.4, whiteSpace:"nowrap", fontSize:"0.8rem" }}>
+                  Lier ✓
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign:"center", color:"#059669", fontWeight:700, fontSize:"0.88rem" }}>
+              ✅ Groupe WhatsApp lié avec succès !
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose} style={{ ...css.btnSecondary, width:"100%", padding:"12px" }}>
+          Continuer sans WhatsApp
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PageGroups({ profile }) {
   const { user } = useAuth();
   const uid = user?.uid || profile?.uid;
@@ -119,6 +190,7 @@ export default function PageGroups({ profile }) {
   const [createForm, setCreateForm] = useState({ name:"", description:"", icon:"💬", color:"#2563eb", waGroupLink:"" });
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState("tous"); // "tous" | "mes"
+  const [waSuccessGroup, setWaSuccessGroup] = useState(null);
 
   const mesGroupes = groups.filter(g => g.members?.includes(uid));
   const displayed  = filter === "mes" ? mesGroupes : groups;
@@ -126,7 +198,7 @@ export default function PageGroups({ profile }) {
   const handleCreate = async () => {
     if (!createForm.name.trim()) return;
     setCreating(true);
-    await createGroup({
+    const newGroup = await createGroup({
       name:        createForm.name.trim(),
       description: createForm.description.trim(),
       icon:        createForm.icon,
@@ -137,8 +209,10 @@ export default function PageGroups({ profile }) {
       createdBy:   uid,
       lastMessage: "",
     });
+    const created = { id: newGroup?.id || "", name: createForm.name.trim(), description: createForm.description.trim() };
     setCreateForm({ name:"", description:"", icon:"💬", color:"#2563eb", waGroupLink:"" });
     setShowCreate(false); setCreating(false);
+    setWaSuccessGroup(created);
   };
 
   const handleJoin = async (g, e) => {
@@ -159,6 +233,17 @@ export default function PageGroups({ profile }) {
 
   return (
     <div style={{ maxWidth:680, margin:"0 auto" }}>
+      {waSuccessGroup && (
+        <WaSuccessModal
+          group={waSuccessGroup}
+          onClose={() => setWaSuccessGroup(null)}
+          onSaveLink={async (link) => {
+            if (waSuccessGroup.id) {
+              await updateDocument("groups", waSuccessGroup.id, { waGroupLink: link });
+            }
+          }}
+        />
+      )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12, marginBottom:20 }}>
         <div>
           <div style={css.pageH}>Groupes</div>

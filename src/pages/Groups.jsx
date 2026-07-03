@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { C, ROLES, css, GRADIENTS, SHADOWS } from "../design";
 import { useAuth } from "../AuthContext";
 import {
-  useGroups, useGroupMessages, createGroup, joinGroup, leaveGroup, sendGroupMessage, updateDocument,
+  useGroups, useGroupMessages, createGroup, joinGroup, leaveGroup, sendGroupMessage, updateDocument, deleteDocument,
 } from "../hooks/useFirestore";
 import { arrayUnion, arrayRemove, serverTimestamp } from "firebase/firestore";
 
@@ -227,6 +227,12 @@ export default function PageGroups({ profile }) {
     if (activeGroup?.id === g.id) setActiveGroup(null);
   };
 
+  const handleDeleteGroup = async (g, e) => {
+    e.stopPropagation();
+    if (!confirm(`Supprimer définitivement le groupe "${g.name}" ? Cette action est irréversible.`)) return;
+    await deleteDocument("groups", g.id);
+  };
+
   if (activeGroup) return <GroupChat group={activeGroup} profile={{...profile, uid}} onBack={() => setActiveGroup(null)} />;
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.muted }}>Chargement…</div>;
@@ -322,6 +328,9 @@ export default function PageGroups({ profile }) {
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
         {displayed.map(g => {
           const isMember = g.members?.includes(uid);
+          const isCreator = g.createdBy === uid;
+          const isAdmin = ["administration","superadmin"].includes(profile?.role);
+          const canDelete = isCreator || isAdmin;
           return (
             <div key={g.id} onClick={() => isMember && setActiveGroup(g)}
               style={{ ...css.card, display:"flex", alignItems:"center", gap:14, cursor:isMember?"pointer":"default",
@@ -332,7 +341,10 @@ export default function PageGroups({ profile }) {
                 {g.icon||"💬"}
               </div>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontWeight:700, color:C.navy, fontSize:"0.92rem", marginBottom:2 }}>{g.name}</div>
+                <div style={{ fontWeight:700, color:C.navy, fontSize:"0.92rem", marginBottom:2 }}>
+                  {g.name}
+                  {isCreator && <span style={{ marginLeft:6, fontSize:"0.65rem", fontWeight:600, color:g.color||C.blue, background:`${g.color||C.blue}15`, padding:"1px 6px", borderRadius:10 }}>Créateur</span>}
+                </div>
                 {g.description && <div style={{ fontSize:"0.76rem", color:C.muted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{g.description}</div>}
                 <div style={{ display:"flex", gap:8, marginTop:4, alignItems:"center", flexWrap:"wrap" }}>
                   <span style={{ fontSize:"0.73rem", color:C.muted }}>👥 {g.members?.length||0} membres</span>
@@ -346,17 +358,25 @@ export default function PageGroups({ profile }) {
                   )}
                 </div>
               </div>
-              <div style={{ flexShrink:0 }}>
+              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end" }}>
                 {isMember ? (
                   <div style={{ display:"flex", gap:6 }}>
                     <span style={{ ...css.badge(C.greenLight, C.green), fontSize:"0.7rem" }}>✓ Membre</span>
-                    <button style={{ ...css.btnSm, background:C.redLight, color:C.red, border:"none", fontSize:"0.72rem" }}
-                      onClick={e => handleLeave(g, e)}>Quitter</button>
+                    {!isCreator && (
+                      <button style={{ ...css.btnSm, background:C.redLight, color:C.red, border:"none", fontSize:"0.72rem" }}
+                        onClick={e => handleLeave(g, e)}>Quitter</button>
+                    )}
                   </div>
                 ) : (
                   <button style={{ ...css.btnPrimary, fontSize:"0.78rem", padding:"7px 14px", borderRadius:20 }}
                     onClick={e => handleJoin(g, e)}>
                     + Rejoindre
+                  </button>
+                )}
+                {canDelete && (
+                  <button style={{ ...css.btnSm, background:C.redLight, color:C.red, border:`1px solid ${C.redBorder}`, fontSize:"0.7rem", padding:"3px 8px" }}
+                    onClick={e => handleDeleteGroup(g, e)}>
+                    🗑 Supprimer
                   </button>
                 )}
               </div>

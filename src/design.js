@@ -54,7 +54,7 @@ const T = "all 0.18s ease";
 const TFast = "all 0.12s ease";
 
 export const css = {
-  app:{ minHeight:"100vh", background:C.bg, color:C.dark, fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:14 },
+  app:{ minHeight:"100vh", background:C.bg, color:C.dark, fontFamily:"'Inter',system-ui,sans-serif", fontSize:14 },
 
   nav:{ position:"sticky", top:0, zIndex:200, background:"#fff",
         borderBottom:`1px solid ${C.border}`, boxShadow:SHADOWS.sm,

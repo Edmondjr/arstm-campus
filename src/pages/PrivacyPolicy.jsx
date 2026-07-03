@@ -238,7 +238,7 @@ function SectionBlock({ s }) {
   );
 }
 
-export default function PrivacyPolicyModal({ onClose, onAccept }) {
+export default function PrivacyPolicyModal({ onClose, onAccept, required = false }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, zIndex: 5000,
@@ -269,14 +269,21 @@ export default function PrivacyPolicyModal({ onClose, onAccept }) {
                 ARSTM Campus · Version 1.0 · Dernière mise à jour : 03/07/2026
               </div>
             </div>
-            <button onClick={onClose} style={{
-              width: 32, height: 32, borderRadius: "50%", border: "none",
-              background: "rgba(255,255,255,0.15)", color: "#fff",
-              cursor: "pointer", fontSize: "0.9rem", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>✕</button>
+            {!required && (
+              <button onClick={onClose} style={{
+                width: 32, height: 32, borderRadius: "50%", border: "none",
+                background: "rgba(255,255,255,0.15)", color: "#fff",
+                cursor: "pointer", fontSize: "0.9rem", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>✕</button>
+            )}
           </div>
-          <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(255,255,255,0.08)", borderRadius: 10, fontSize: "0.77rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.55 }}>
+          {required && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(251,191,36,0.15)", borderRadius: 8, fontSize: "0.75rem", color: "#fbbf24", lineHeight: 1.55 }}>
+              ⚠️ Veuillez lire et accepter cette politique pour accéder à la plateforme. Sinon, vous serez déconnecté(e).
+            </div>
+          )}
+          <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(255,255,255,0.08)", borderRadius: 10, fontSize: "0.77rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.55 }}>
             Applicable dans le cadre de la phase de test d'ARSTM Campus. Conforme à la Loi n°2013-450 de Côte d'Ivoire relative à la protection des données personnelles (ARTCI).
           </div>
         </div>
@@ -296,11 +303,13 @@ export default function PrivacyPolicyModal({ onClose, onAccept }) {
           gap: 10,
         }}>
           <button onClick={onClose} style={{
-            flex: 1, padding: "12px", borderRadius: 10, border: `1px solid ${C.border}`,
-            background: "#fff", color: C.mid, cursor: "pointer",
-            fontFamily: "inherit", fontWeight: 600, fontSize: "0.86rem",
+            flex: 1, padding: "12px", borderRadius: 10,
+            border: required ? "none" : `1px solid ${C.border}`,
+            background: required ? "#fef2f2" : "#fff",
+            color: required ? "#dc2626" : C.mid,
+            cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: "0.86rem",
           }}>
-            Fermer
+            {required ? "🚪 Se déconnecter" : "Fermer"}
           </button>
           {onAccept && (
             <button onClick={() => { onAccept(); onClose(); }} style={{

@@ -7,8 +7,9 @@ import { db } from "./firebase";
 import Login from "./pages/Login";
 import PageProfil from "./pages/Profil";
 import { ProfilExterne } from "./pages/Profil";
-import { useNotifs } from "./hooks/useFirestore";
+import { useNotifs, updateDocument } from "./hooks/useFirestore";
 import GlobalSearch from "./components/GlobalSearch";
+import PrivacyPolicyModal from "./pages/PrivacyPolicy";
 
 const Accueil          = lazy(() => import("./pages/Accueil"));
 const PageEDT          = lazy(() => import("./pages/EDT"));
@@ -100,6 +101,18 @@ export default function App() {
   }, [profile?.role]);
 
   if (!user || !profile) return <Login />;
+
+  // ── PRIVACY GATE : utilisateurs connectés sans consentement ──
+  // onClose = logout (refuser = quitter la plateforme)
+  if (!profile.privacyAccepted) {
+    return (
+      <PrivacyPolicyModal
+        onClose={logout}
+        onAccept={() => updateDocument("users", user.uid, { privacyAccepted: true })}
+        required
+      />
+    );
+  }
 
   const isMobile     = winW < 820;
   const isSuperAdmin = profile.role === "superadmin";

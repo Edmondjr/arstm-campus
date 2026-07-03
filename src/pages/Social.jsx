@@ -240,7 +240,7 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil, onShare, allUsers = 
           {p.mediaType === "video" ? (
             <video controls src={p.mediaUrl} style={{ width:"100%", maxHeight:360, objectFit:"contain", background:"#000", display:"block" }}/>
           ) : (
-            <img src={p.mediaUrl} alt="media" style={{ width:"100%", maxHeight:400, objectFit:"cover", display:"block" }}
+            <img src={p.mediaUrl} alt="media" style={{ width:"100%", maxHeight:560, objectFit:"contain", background:"#0a0a0a", display:"block" }}
               onClick={() => setLightboxImg(p.mediaUrl)}/>
           )}
         </div>
@@ -259,7 +259,7 @@ function PostCard({ p, uid, profile, onReact, onOpenProfil, onShare, allUsers = 
             <div style={{ marginTop:8, borderRadius:8, overflow:"hidden", maxHeight:240 }}>
               {p.sharedFrom.mediaType === "video"
                 ? <video controls src={p.sharedFrom.mediaUrl} style={{ width:"100%", maxHeight:240, background:"#000", display:"block" }}/>
-                : <img src={p.sharedFrom.mediaUrl} alt="" style={{ width:"100%", maxHeight:240, objectFit:"cover", display:"block", cursor:"zoom-in" }}
+                : <img src={p.sharedFrom.mediaUrl} alt="" style={{ width:"100%", maxHeight:300, objectFit:"contain", background:"#111", display:"block", cursor:"zoom-in" }}
                     onClick={() => setLightboxImg(p.sharedFrom.mediaUrl)}/>}
             </div>
           )}
@@ -505,7 +505,7 @@ function PostComposer({ profile, onPublish, r }) {
             {mediaType === "video"
               ? <video src={mediaPreview} controls style={{ width:"100%", maxHeight:200, objectFit:"cover" }}/>
               : <img src={mediaPreview} alt="preview"
-                  style={{ width:"100%", maxHeight:200, objectFit:"cover",
+                  style={{ width:"100%", maxHeight:380, objectFit:"contain", background:"#111",
                     transform:`rotate(${rotation * 90}deg)`,
                     filter:`brightness(${brightness}%) contrast(${contrast}%)`,
                     transition:"transform 0.2s, filter 0.2s" }}/>

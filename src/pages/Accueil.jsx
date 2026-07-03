@@ -42,96 +42,229 @@ async function uploadMedia(file, uid, onProgress) {
   });
 }
 
-// ── Composer ──────────────────────────────────────────────────────────────────
+// ── Barre de formatage ────────────────────────────────────────────────────────
+function FormatToolbar({ textareaRef, setText }) {
+  const wrap = (open, close) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const val = ta.value;
+    const newVal = val.slice(0, s) + open + val.slice(s, e) + close + val.slice(e);
+    setText(newVal);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(s + open.length, e + open.length); }, 10);
+  };
+  const btns = [
+    { label:"B", title:"Gras (**)", open:"**", close:"**", style:{ fontWeight:700 } },
+    { label:"I", title:"Italique (_)", open:"_", close:"_", style:{ fontStyle:"italic" } },
+    { label:"U", title:"Souligné (__)", open:"__", close:"__", style:{ textDecoration:"underline" } },
+    { label:"S", title:"Surligner (==)", open:"==", close:"==", style:{ background:"#fef08a", borderRadius:3, padding:"0 2px" } },
+  ];
+  return (
+    <div style={{ display:"flex", gap:4, marginBottom:6 }}>
+      {btns.map(b => (
+        <button key={b.label} title={b.title} onClick={() => wrap(b.open, b.close)}
+          style={{ ...b.style, width:28, height:28, borderRadius:6, border:`1px solid ${C.border}`,
+            background:C.surfaceAlt, cursor:"pointer", fontSize:"0.8rem", display:"flex", alignItems:"center",
+            justifyContent:"center", fontFamily:"inherit" }}
+          onMouseEnter={ev => ev.currentTarget.style.background=C.blueLight}
+          onMouseLeave={ev => ev.currentTarget.style.background=C.surfaceAlt}>
+          {b.label}
+        </button>
+      ))}
+      <span style={{ fontSize:"0.68rem", color:C.muted, display:"flex", alignItems:"center", marginLeft:4 }}>Sélectionner puis cliquer</span>
+    </div>
+  );
+}
+
+// ── Composer premium ──────────────────────────────────────────────────────────
 function PostComposer({ profile, onPublish }) {
   const { user } = useAuth();
   const ri = getRoleInfo(profile?.role);
-  const [text,  setText]    = useState("");
-  const [file,  setFile]    = useState(null);
-  const [prev,  setPrev]    = useState(null);
-  const [mtype, setMtype]   = useState(null);
-  const [prog,  setProg]    = useState(0);
-  const [upl,   setUpl]     = useState(false);
-  const [saving,setSaving]  = useState(false);
-  const [err,   setErr]     = useState("");
-  const fileRef = useRef();
+  const [text,       setText]     = useState("");
+  const [mediaFile,  setMedia]    = useState(null);
+  const [mediaPreview, setPreview]= useState(null);
+  const [mediaType,  setType]     = useState(null);
+  const [progress,   setProgress] = useState(0);
+  const [uploading,  setUploading]= useState(false);
+  const [saving,     setSaving]   = useState(false);
+  const [rotation,   setRotation] = useState(0);
+  const [brightness, setBrightness] = useState(100);
+  const [contrast,   setContrast] = useState(100);
+  const [vidDuration, setVidDur]  = useState(null);
+  const textareaRef = useRef();
+  const imgRef  = useRef();
+  const vidRef  = useRef();
 
-  const pick = (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    const isVid = f.type.startsWith("video/"), isImg = f.type.startsWith("image/");
-    if (!isVid && !isImg) { setErr("Image ou vidéo uniquement."); return; }
-    if (isImg && f.size > MAX_IMG) { setErr("Image max 10 Mo."); return; }
-    if (isVid && f.size > MAX_VID) { setErr("Vidéo max 50 Mo."); return; }
-    setErr(""); setFile(f); setMtype(isVid?"video":"image");
-    setPrev(URL.createObjectURL(f));
+  const resetMedia = () => {
+    setMedia(null); setPreview(null); setType(null);
+    setRotation(0); setBrightness(100); setContrast(100); setVidDur(null);
   };
 
-  const clear = () => { setFile(null); setPrev(null); setMtype(null); setProg(0); fileRef.current && (fileRef.current.value=""); };
+  const handleImage = (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { alert("Fichier image uniquement."); return; }
+    if (f.size > MAX_IMG) { alert("Image max 10 Mo."); return; }
+    resetMedia(); setMedia(f); setType("image"); setPreview(URL.createObjectURL(f));
+  };
+
+  const handleVideo = (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("video/")) { alert("Fichier vidéo uniquement."); return; }
+    if (f.size > MAX_VID) { alert("Vidéo max 50 Mo."); return; }
+    const url = URL.createObjectURL(f);
+    const vid = document.createElement("video");
+    vid.preload = "metadata"; vid.src = url;
+    vid.onloadedmetadata = () => {
+      if (vid.duration > 30) { URL.revokeObjectURL(url); alert(`Vidéo trop longue (${Math.round(vid.duration)}s). Max 30s.`); return; }
+      resetMedia(); setMedia(f); setType("video"); setPreview(url); setVidDur(Math.round(vid.duration));
+    };
+  };
+
+  const processImageFile = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const rad = (rotation * 90 * Math.PI) / 180;
+      const swapped = rotation % 2 !== 0;
+      const w = swapped ? img.naturalHeight : img.naturalWidth;
+      const h = swapped ? img.naturalWidth  : img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    };
+    img.src = url;
+  });
 
   const publish = async () => {
-    if (!text.trim() && !file) return;
-    setErr(""); setSaving(true);
+    if (!text.trim() && !mediaFile) return;
+    setSaving(true);
     let mediaUrl = null;
-    if (file) {
-      setUpl(true);
-      try {
-        mediaUrl = await uploadMedia(file, user?.uid || "anon", setProg);
-      } catch(e) {
-        setErr(`Erreur upload : ${e.message || "vérifiez la connexion et réessayez."}`);
-        setUpl(false); setSaving(false); return;
+    if (mediaFile) {
+      setUploading(true);
+      const uid = user?.uid || profile?.uid || "anon";
+      let uploadFile = mediaFile;
+      if (mediaType === "image") {
+        const blob = await processImageFile(mediaFile);
+        uploadFile = new File([blob], mediaFile.name.replace(/\.[^.]+$/, ".jpg"), { type:"image/jpeg" });
       }
-      setUpl(false);
+      mediaUrl = await uploadMedia(uploadFile, uid, setProgress);
+      setUploading(false);
     }
-    await onPublish(text.trim(), mediaUrl, mtype);
-    setText(""); clear(); setSaving(false);
+    await onPublish(text.trim(), mediaUrl, mediaType);
+    setText(""); resetMedia(); setProgress(0); setSaving(false);
   };
 
+  const btnEdit = { padding:"4px 10px", borderRadius:8, border:`1px solid ${C.border}`, background:"transparent", cursor:"pointer", fontSize:"0.78rem", fontFamily:"inherit" };
+  const canPost = !saving && (!!text.trim() || !!mediaFile);
+
   return (
-    <div style={{ ...css.card, marginBottom:14 }}>
-      <div style={{ display:"flex", gap:10, marginBottom:10 }}>
-        <div style={{ width:40, height:40, borderRadius:"50%", flexShrink:0, overflow:"hidden",
-          background:profile.photoURL?"transparent":ri.bg, color:ri.color,
-          display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:"0.85rem",
-          border:`2px solid ${ri.color}20` }}>
-          {profile.photoURL ? <img src={profile.photoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (profile.avatar||profile.name?.slice(0,2))}
+    <div style={{ ...css.card, marginBottom:14, padding:0, overflow:"hidden" }}>
+      {/* Header gradient */}
+      <div style={{ background:`linear-gradient(135deg,${C.navy},#1e3a5f)`, padding:"12px 16px 0" }}>
+        <div style={{ display:"flex", gap:10 }}>
+          <div style={{ width:42, height:42, borderRadius:"50%", flexShrink:0, overflow:"hidden",
+            background:profile.photoURL?"transparent":ri.bg, color:ri.color,
+            display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:"0.88rem",
+            border:"2px solid rgba(255,255,255,0.3)", boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
+            {profile.photoURL ? <img src={profile.photoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (profile.avatar||profile.name?.slice(0,2))}
+          </div>
+          <div style={{ flex:1, paddingBottom:12 }}>
+            <div style={{ fontSize:"0.72rem", color:"rgba(255,255,255,0.5)", marginBottom:4 }}>
+              <span style={{ color:"rgba(255,255,255,0.8)", fontWeight:600 }}>{profile.name}</span> · {ri.icon} {ri.label}
+            </div>
+            <FormatToolbar textareaRef={textareaRef} setText={setText}/>
+          </div>
         </div>
-        <textarea style={{ ...css.input, resize:"none", minHeight:72, flex:1, borderRadius:12, lineHeight:1.6 }}
-          placeholder="Partagez quelque chose avec la communauté ARSTM…"
-          value={text} onChange={e=>{setText(e.target.value);setErr("");}}/>
       </div>
 
-      {err && <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:9, padding:"8px 12px", marginBottom:10, fontSize:"0.8rem", color:"#dc2626" }}>⚠️ {err}</div>}
+      {/* Corps */}
+      <div style={{ padding:"12px 16px 14px" }}>
+        <textarea ref={textareaRef}
+          style={{ ...css.input, resize:"none", minHeight:80, width:"100%", borderRadius:12, lineHeight:1.7, fontSize:"0.9rem" }}
+          placeholder="Quoi de neuf sur le campus ? Partagez avec la communauté ARSTM…"
+          value={text} onChange={e => setText(e.target.value)}/>
 
-      {prev && (
-        <div style={{ position:"relative", marginBottom:10, borderRadius:12, overflow:"hidden", background:"#000" }}>
-          {mtype==="video"
-            ? <video src={prev} controls style={{width:"100%",maxHeight:220,display:"block"}}/>
-            : <img src={prev} alt="" style={{width:"100%",maxHeight:280,objectFit:"cover",display:"block"}}/>}
-          <button onClick={clear} style={{ position:"absolute",top:8,right:8,width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",cursor:"pointer",fontSize:"0.85rem",display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
-        </div>
-      )}
-
-      {upl && (
-        <div style={{ marginBottom:10 }}>
-          <div style={{ background:C.surfaceAlt, borderRadius:100, height:6, overflow:"hidden" }}>
-            <div style={{ width:`${prog}%`, height:"100%", background:`linear-gradient(90deg,${C.blue},${C.aqua})`, borderRadius:100, transition:"width 0.3s" }}/>
+        {/* Aperçu média */}
+        {mediaPreview && (
+          <div style={{ marginTop:10 }}>
+            <div style={{ position:"relative", borderRadius:12, overflow:"hidden", background:"#111" }}>
+              {mediaType === "video"
+                ? <video src={mediaPreview} controls style={{ width:"100%", maxHeight:280, display:"block" }}/>
+                : <img src={mediaPreview} alt="preview"
+                    style={{ width:"100%", maxHeight:400, objectFit:"contain", background:"#111",
+                      transform:`rotate(${rotation * 90}deg)`,
+                      filter:`brightness(${brightness}%) contrast(${contrast}%)`,
+                      transition:"transform 0.2s, filter 0.2s", display:"block" }}/>}
+              {mediaType === "video" && vidDuration !== null && (
+                <span style={{ position:"absolute", bottom:8, left:8, background:"rgba(0,0,0,0.65)", color:"#fff",
+                  borderRadius:8, padding:"2px 8px", fontSize:"0.78rem" }}>⏱ {vidDuration}s</span>
+              )}
+              <button onClick={resetMedia}
+                style={{ position:"absolute", top:8, right:8, width:28, height:28, borderRadius:"50%",
+                  background:"rgba(0,0,0,0.6)", color:"#fff", border:"none", cursor:"pointer", fontSize:"0.85rem",
+                  display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+            </div>
+            {mediaType === "image" && (
+              <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:8,
+                padding:"10px 12px", background:C.bg, borderRadius:10, border:`1px solid ${C.border}` }}>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button style={btnEdit} onClick={() => setRotation(r => (r - 1 + 4) % 4)}>↺ Gauche</button>
+                  <button style={btnEdit} onClick={() => setRotation(r => (r + 1) % 4)}>↻ Droite</button>
+                </div>
+                <label style={{ fontSize:"0.78rem", color:C.muted }}>
+                  Luminosité : {brightness}%
+                  <input type="range" min={70} max={130} value={brightness}
+                    onChange={e => setBrightness(Number(e.target.value))} style={{ display:"block", width:"100%", marginTop:2 }}/>
+                </label>
+                <label style={{ fontSize:"0.78rem", color:C.muted }}>
+                  Contraste : {contrast}%
+                  <input type="range" min={70} max={130} value={contrast}
+                    onChange={e => setContrast(Number(e.target.value))} style={{ display:"block", width:"100%", marginTop:2 }}/>
+                </label>
+              </div>
+            )}
           </div>
-          <div style={{ fontSize:"0.72rem", color:C.muted, marginTop:3 }}>Upload {prog}%…</div>
-        </div>
-      )}
+        )}
 
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div>
-          <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={pick}/>
-          <button onClick={()=>fileRef.current?.click()}
-            style={{ padding:"7px 12px", borderRadius:20, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontSize:"0.8rem", color:C.mid, fontFamily:"inherit", display:"flex", alignItems:"center", gap:5 }}>
-            🖼 Photo/Vidéo
+        {/* Upload progress */}
+        {uploading && (
+          <div style={{ marginTop:10 }}>
+            <div style={{ background:C.surfaceAlt, borderRadius:100, height:5, overflow:"hidden" }}>
+              <div style={{ width:`${progress}%`, height:"100%", background:`linear-gradient(90deg,${C.blue},${C.aqua})`, borderRadius:100, transition:"width 0.3s" }}/>
+            </div>
+            <div style={{ fontSize:"0.72rem", color:C.muted, marginTop:3 }}>Upload {progress}%…</div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:12, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
+          <div style={{ display:"flex", gap:6 }}>
+            <button onClick={() => imgRef.current?.click()}
+              style={{ padding:"7px 12px", borderRadius:20, border:`1px solid ${C.border}`, background:"#fff",
+                cursor:"pointer", fontSize:"0.8rem", color:C.mid, display:"flex", alignItems:"center", gap:5 }}>
+              📷 Photo
+            </button>
+            <button onClick={() => vidRef.current?.click()}
+              style={{ padding:"7px 12px", borderRadius:20, border:`1px solid ${C.border}`, background:"#fff",
+                cursor:"pointer", fontSize:"0.8rem", color:C.mid, display:"flex", alignItems:"center", gap:5 }}>
+              🎬 Vidéo
+            </button>
+            <input ref={imgRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{display:"none"}} onChange={handleImage}/>
+            <input ref={vidRef} type="file" accept="video/mp4,video/webm,video/quicktime" style={{display:"none"}} onChange={handleVideo}/>
+          </div>
+          <button onClick={publish} disabled={!canPost}
+            style={{ ...css.btnPrimary, borderRadius:20, opacity:canPost?1:0.5, paddingLeft:20, paddingRight:20 }}>
+            {saving ? (uploading ? `⬆ ${progress}%` : "Publication…") : "Publier →"}
           </button>
         </div>
-        <button onClick={publish} disabled={saving||upl||(!text.trim()&&!file)}
-          style={{ ...css.btnPrimary, borderRadius:20, opacity:(saving||upl||(!text.trim()&&!file))?0.55:1 }}>
-          {saving?(upl?`⬆ ${prog}%`:"Publication…"):"Publier →"}
-        </button>
       </div>
     </div>
   );
@@ -342,7 +475,7 @@ function FeedPost({ p, uid, profile, onReact, onRepost, onViewProfile }) {
         <div style={{ marginBottom:10, borderRadius:12, overflow:"hidden", background:"#000" }}>
           {p.mediaType==="video"
             ?<video controls src={p.mediaUrl} style={{width:"100%",maxHeight:340,display:"block"}}/>
-            :<img src={p.mediaUrl} alt="" style={{width:"100%",maxHeight:400,objectFit:"cover",display:"block"}}/>}
+            :<img src={p.mediaUrl} alt="" style={{width:"100%",maxHeight:560,objectFit:"contain",background:"#0a0a0a",display:"block"}}/>}
         </div>
       )}
 
@@ -352,7 +485,7 @@ function FeedPost({ p, uid, profile, onReact, onRepost, onViewProfile }) {
           <div style={{ fontSize:"0.78rem",fontWeight:700,color:C.navy,marginBottom:4 }}>🔁 {p.sharedFrom.auteur}</div>
           {p.sharedFrom.texte && <p style={{ fontSize:"0.82rem",lineHeight:1.6,color:C.dark,margin:0 }}>{p.sharedFrom.texte}</p>}
           {p.sharedFrom.mediaUrl && p.sharedFrom.mediaType!=="video" && (
-            <img src={p.sharedFrom.mediaUrl} alt="" style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:8,marginTop:8,display:"block"}}/>
+            <img src={p.sharedFrom.mediaUrl} alt="" style={{width:"100%",maxHeight:300,objectFit:"contain",background:"#111",borderRadius:8,marginTop:8,display:"block"}}/>
           )}
         </div>
       )}

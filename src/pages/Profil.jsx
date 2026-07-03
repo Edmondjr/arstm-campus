@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../AuthContext";
 import { C, ROLES, css } from "../design";
 import { updateDocument, sendNotif } from "../hooks/useFirestore";
@@ -171,6 +171,108 @@ function ProfilRoleFields({ role, editMode, profile,
   return null;
 }
 
+// ─── Modal crop photo de profil ───────────────────────────────────────────────
+function AvatarCropModal({ file, onConfirm, onClose }) {
+  const SIZE = 260;
+  const canvasRef = useRef(null);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef(null);
+  const imgRef  = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { imgRef.current = img; setReady(true); };
+    img.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const ctx = canvas.getContext("2d");
+    const scale = Math.max(SIZE / img.naturalWidth, SIZE / img.naturalHeight) * zoom;
+    const w = img.naturalWidth * scale;
+    const h = img.naturalHeight * scale;
+    const x = (SIZE - w) / 2 + offset.x;
+    const y = (SIZE - h) / 2 + offset.y;
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, x, y, w, h);
+  }, [zoom, offset]);
+
+  useEffect(() => { if (ready) draw(); }, [ready, draw]);
+
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+  };
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    setOffset({ x: dragRef.current.ox + e.clientX - dragRef.current.x, y: dragRef.current.oy + e.clientY - dragRef.current.y });
+  };
+  const onPointerUp = () => { dragRef.current = null; };
+
+  const handleConfirm = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    const out = document.createElement("canvas");
+    out.width = SIZE; out.height = SIZE;
+    const ctx = out.getContext("2d");
+    ctx.beginPath();
+    ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const scale = Math.max(SIZE / img.naturalWidth, SIZE / img.naturalHeight) * zoom;
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const x = (SIZE - w) / 2 + offset.x, y = (SIZE - h) / 2 + offset.y;
+    ctx.drawImage(img, x, y, w, h);
+    out.toBlob(blob => {
+      const reader = new FileReader();
+      reader.onload = ev => onConfirm(ev.target.result);
+      reader.readAsDataURL(blob);
+    }, "image/jpeg", 0.92);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(0,0,0,0.75)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div className="modal-enter" style={{ background:"#fff", borderRadius:22, padding:"24px 20px", width:"100%", maxWidth:340, boxShadow:"0 24px 60px rgba(0,0,0,0.4)" }}>
+        <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem", color:C.navy, marginBottom:16, textAlign:"center" }}>
+          ✂️ Recadrer la photo de profil
+        </div>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
+          <div style={{ position:"relative", width:SIZE, height:SIZE }}>
+            <canvas ref={canvasRef} width={SIZE} height={SIZE}
+              style={{ borderRadius:"50%", cursor:"grab", display:"block", boxShadow:`0 0 0 3px ${C.blue}, 0 4px 20px rgba(37,99,235,0.3)` }}
+              onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}/>
+            <div style={{ position:"absolute", inset:0, borderRadius:"50%", pointerEvents:"none",
+              border:"2px solid rgba(255,255,255,0.5)",
+              boxShadow:"inset 0 0 0 1px rgba(255,255,255,0.2)" }}/>
+          </div>
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:"0.78rem", color:C.muted, marginBottom:4 }}>
+            <span>Zoom</span><span>{zoom.toFixed(1)}×</span>
+          </div>
+          <input type="range" min={1} max={3} step={0.05} value={zoom}
+            onChange={e => setZoom(parseFloat(e.target.value))} style={{ width:"100%", accentColor:C.blue }}/>
+          <div style={{ fontSize:"0.72rem", color:C.muted, textAlign:"center", marginTop:6 }}>
+            Faites glisser l'image pour la repositionner
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onClose} style={{ ...css.btnSecondary, flex:1, padding:"11px" }}>Annuler</button>
+          <button onClick={handleConfirm} disabled={!ready}
+            style={{ ...css.btnPrimary, flex:2, padding:"11px", textAlign:"center", opacity:ready?1:0.5 }}>
+            ✓ Appliquer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page Mon Profil ──────────────────────────────────────────────────────────
 export default function PageProfil({ profile, onLogout, setPage }) {
   const authCtx = useAuth();
@@ -229,19 +331,22 @@ export default function PageProfil({ profile, onLogout, setPage }) {
   const roleInfo = ROLES.find(r=>r.id===profile?.role)||ROLES[0];
   const initials = profile?.avatar||profile?.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
 
-  const handlePhotoUpload = async(e)=>{
-    const file=e.target.files[0]; if(!file) return;
-    if(file.size>3000000){alert("Max 3 Mo"); return;}
+  const [cropFile, setCropFile] = useState(null);
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    if (file.size > 15000000) { alert("Max 15 Mo"); return; }
+    setCropFile(file);
+  };
+
+  const handleCropConfirm = async (b64) => {
+    setCropFile(null);
     setUploading(true);
-    const reader=new FileReader();
-    reader.onload=async(ev)=>{
-      const b64=ev.target.result;
-      setPhotoURL(b64);
-      await updateDocument("users",profile?.uid,{photoURL:b64});
-      if(reloadProfile) await reloadProfile(profile?.uid);
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
+    setPhotoURL(b64);
+    await updateDocument("users", profile?.uid, { photoURL: b64 });
+    if (reloadProfile) await reloadProfile(profile?.uid);
+    setUploading(false);
   };
 
   const handleSave=async()=>{
@@ -317,6 +422,7 @@ export default function PageProfil({ profile, onLogout, setPage }) {
 
   return (
     <div style={{maxWidth:640,margin:"0 auto",paddingBottom:32}}>
+      {cropFile && <AvatarCropModal file={cropFile} onClose={() => setCropFile(null)} onConfirm={handleCropConfirm}/>}
 
       {/* ── HEADER PREMIUM ── */}
       <div style={{borderRadius:22,overflow:"hidden",marginBottom:16,boxShadow:"0 8px 32px rgba(0,0,0,0.15)"}}>

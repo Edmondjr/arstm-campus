@@ -4,16 +4,22 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "AIzaSyAyp_S0bfus9A5-K-PqWW5hcXd5_bbGpA4",
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || "arstm-campus.firebaseapp.com",
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || "arstm-campus",
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "arstm-campus.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1004916135001",
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "1:1004916135001:web:b755bc5b51851c73374d48",
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
+
+// Fail fast si une variable d'env Firebase est manquante (évite les erreurs silencieuses en prod)
+const missingVars = Object.entries(firebaseConfig).filter(([, v]) => !v).map(([k]) => k);
+if (missingVars.length > 0) {
+  throw new Error(`[firebase.js] Variables d'environnement manquantes : ${missingVars.join(", ")}\nVérifiez votre fichier .env.local`);
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth    = getAuth(app);
 export const db      = getFirestore(app);
-export const storage = getStorage(app, "gs://arstm-campus.firebasestorage.app");
+export const storage = getStorage(app, `gs://${firebaseConfig.storageBucket}`);
 export default app;

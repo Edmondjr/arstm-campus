@@ -1,0 +1,202 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+    function myDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function myRole() {
+      return myDoc().role;
+    }
+    function myStatus() {
+      return myDoc().status;
+    }
+    function isApproved() {
+      return isAuth() && myStatus() == "approved";
+    }
+    function isAdmin() {
+      return isApproved() && myRole() in ["administration", "superadmin"];
+    }
+    function isSuperAdmin() {
+      return isApproved() && myRole() == "superadmin";
+    }
+
+    // ── Champs protégés que l'utilisateur ne peut pas modifier lui-même ──────
+    function noSelfEscalation() {
+      return !request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny(["role", "status", "warned", "warnedBy", "warnedAt", "privacyAccepted"]);
+    }
+
+    // ── Collection : users ───────────────────────────────────────────────────
+    match /users/{uid} {
+      // Lecture : utilisateur lui-même ou tout membre approuvé (profil public)
+      allow read: if isAuth() && (isOwner(uid) || isApproved());
+
+      // Création à l'inscription (uid = UID Firebase Auth)
+      allow create: if isAuth() && isOwner(uid)
+        && request.resource.data.role in ["etudiant","enseignant","alumni","administration"]
+        && request.resource.data.status == "pending";
+
+      // Mise à jour : l'utilisateur peut modifier ses propres champs non sensibles
+      allow update: if isAuth() && isOwner(uid) && isApproved() && noSelfEscalation();
+
+      // Mise à jour admin : role, status, warned, etc.
+      allow update: if isAdmin();
+
+      // Suppression : superadmin uniquement
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Collection : posts ───────────────────────────────────────────────────
+    match /posts/{postId} {
+      allow read: if isApproved();
+
+      allow create: if isApproved()
+        && request.resource.data.auteurUid == request.auth.uid
+        && request.resource.data.texte is string
+        && request.resource.data.texte.size() <= 2000;
+
+      // Auteur ou admin peut modifier (réactions acceptées aussi)
+      allow update: if isApproved()
+        && (resource.data.auteurUid == request.auth.uid || isAdmin());
+
+      allow delete: if isApproved()
+        && (resource.data.auteurUid == request.auth.uid || isAdmin());
+
+      // Commentaires
+      match /comments/{commentId} {
+        allow read: if isApproved();
+
+        allow create: if isApproved()
+          && request.resource.data.auteurUid == request.auth.uid
+          && request.resource.data.texte.size() <= 1000;
+
+        allow delete: if isApproved()
+          && (resource.data.auteurUid == request.auth.uid || isAdmin());
+      }
+    }
+
+    // ── Collection : annonces ────────────────────────────────────────────────
+    match /annonces/{id} {
+      allow read: if isApproved();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Collection : tickets (support) ───────────────────────────────────────
+    match /tickets/{id} {
+      // L'auteur peut lire son propre ticket, les admins voient tout
+      allow read: if isApproved()
+        && (resource.data.auteurUid == request.auth.uid || isAdmin());
+
+      allow create: if isApproved()
+        && request.resource.data.auteurUid == request.auth.uid
+        && request.resource.data.message.size() <= 3000;
+
+      // Seuls les admins modifient (assignation, réponse, clôture)
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Collection : groups ──────────────────────────────────────────────────
+    match /groups/{groupId} {
+      allow read: if isApproved();
+
+      allow create: if isApproved()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isApproved()
+        && (resource.data.createdBy == request.auth.uid || isAdmin());
+
+      allow delete: if isApproved()
+        && (resource.data.createdBy == request.auth.uid || isAdmin());
+
+      match /messages/{msgId} {
+        allow read: if isApproved()
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
+
+        allow create: if isApproved()
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.text.size() <= 2000;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Collection : edt (emploi du temps) ──────────────────────────────────
+    match /edt/{id} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : ressources ──────────────────────────────────────────────
+    match /ressources/{id} {
+      allow read: if isApproved();
+
+      allow create: if isApproved()
+        && request.resource.data.auteurUid == request.auth.uid;
+
+      allow update, delete: if isApproved()
+        && (resource.data.auteurUid == request.auth.uid || isAdmin());
+    }
+
+    // ── Collection : offres (alumni) ─────────────────────────────────────────
+    match /offres/{id} {
+      allow read: if isApproved();
+
+      allow create: if isApproved()
+        && request.resource.data.auteurUid == request.auth.uid;
+
+      allow update, delete: if isApproved()
+        && (resource.data.auteurUid == request.auth.uid || isAdmin());
+    }
+
+    // ── Collection : notifications ───────────────────────────────────────────
+    match /notifications/{uid}/items/{notifId} {
+      // L'utilisateur lit et marque ses propres notifications
+      allow read, update: if isAuth() && isOwner(uid);
+
+      // Tout membre approuvé peut envoyer une notification (sendNotif)
+      allow create: if isApproved();
+
+      allow delete: if isAuth() && isOwner(uid);
+    }
+
+    // ── Collection : presence ────────────────────────────────────────────────
+    match /presence/{uid} {
+      allow read: if isApproved();
+      // Chaque utilisateur écrit uniquement sa propre présence
+      allow write: if isAuth() && isOwner(uid);
+    }
+
+    // ── Collection : activity ────────────────────────────────────────────────
+    match /activity/{id} {
+      allow read: if isAdmin();
+      allow create: if isApproved();
+      allow update, delete: if false;
+    }
+
+    // ── Collection : changeRequests ──────────────────────────────────────────
+    match /changeRequests/{id} {
+      allow create: if isApproved()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow read, update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Tout le reste est refusé par défaut ──────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

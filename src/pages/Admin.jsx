@@ -591,6 +591,17 @@ function CentreSupport({ allTickets, openTickets, progressTickets, resolvedTicke
 export default function PageAdmin({ profile, activeMode = "control" }) {
   usePresence(profile?.uid);
 
+  if (!profile || !["administration","superadmin"].includes(profile.role) || profile.status !== "approved") {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+        minHeight:"60vh", gap:12, color:"#6b7280", textAlign:"center", padding:24 }}>
+        <span style={{ fontSize:"2.5rem" }}>🔒</span>
+        <div style={{ fontWeight:700, color:"#1e3a5f", fontSize:"1.1rem" }}>Accès refusé</div>
+        <div style={{ fontSize:"0.9rem" }}>Cette page est réservée aux administrateurs.</div>
+      </div>
+    );
+  }
+
   const { data: pending }        = useUsers("pending");
   const { data: approved }       = useUsers("approved");
   const { data: rejected }       = useUsers("rejected");

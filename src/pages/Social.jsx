@@ -388,7 +388,8 @@ function PostComposer({ profile, onPublish, r }) {
   const textareaRef = useRef();
 
   const resetMedia = () => {
-    setMedia(null); setPreview(null); setType(null);
+    setPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setMedia(null); setType(null);
     setRotation(0); setBrightness(100); setContrast(100);
     setVidDuration(null);
   };

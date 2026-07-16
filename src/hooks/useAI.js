@@ -1,8 +1,6 @@
 // src/hooks/useAI.js
 import { useState } from "react";
 
-const API_KEY = import.meta.env.VITE_ANTHROPIC_KEY;
-
 // ── Lecture du fichier selon son type ─────────────────────────────────────────
 async function readFileContent(file) {
   // Images → Claude vision (base64)
@@ -39,17 +37,13 @@ async function readFileContent(file) {
   });
 }
 
-// ── Appel API Claude ───────────────────────────────────────────────────────────
+// ── Appel API Claude via le proxy serveur /api/ai ─────────────────────────────
+// La clé Anthropic est stockée côté serveur (Vercel env var ANTHROPIC_KEY)
+// et n'est jamais exposée dans le bundle JS client.
 async function callClaude(content, system) {
-  if (!API_KEY) throw new Error("Clé VITE_ANTHROPIC_KEY manquante");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/ai", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 4096,
@@ -57,7 +51,10 @@ async function callClaude(content, system) {
       messages: [{ role: "user", content }],
     }),
   });
-  if (!res.ok) throw new Error(`Erreur API HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur serveur HTTP ${res.status}`);
+  }
   const data = await res.json();
   return data.content?.[0]?.text || "";
 }
@@ -80,7 +77,6 @@ export function useAI() {
 
   // Extraire un emploi du temps → tableau de cours
   const parseSchedule = async (file) => {
-    if (!API_KEY) { setError("Clé API manquante (VITE_ANTHROPIC_KEY)"); return null; }
     setLoading(true); setError(null);
     try {
       const fileData = await readFileContent(file);
@@ -113,7 +109,6 @@ Si une information est absente, utilise une chaîne vide. Pour le jour, utilise 
 
   // Extraire une offre d'emploi → objet de champs
   const parseJobOffer = async (file) => {
-    if (!API_KEY) { setError("Clé API manquante (VITE_ANTHROPIC_KEY)"); return null; }
     setLoading(true); setError(null);
     try {
       const fileData = await readFileContent(file);

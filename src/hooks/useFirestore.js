@@ -4,6 +4,7 @@ import {
   query,
   orderBy,
   onSnapshot,
+  getDocs,
   where,
   addDoc,
   updateDoc,
@@ -33,7 +34,8 @@ export function useCollection(colName, constraints = []) {
       () => setLoading(false)
     );
     return unsub;
-  }, [colName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colName, JSON.stringify(constraints.map(c => c?.type))]);
 
   return { data, loading };
 }
@@ -192,11 +194,10 @@ export function useNotifs(uid) {
   return { notifs, unread, loading };
 }
 
-export const markNotifsRead = (uid) => {
+export const markNotifsRead = async (uid) => {
   const q = query(collection(db, 'notifications', uid, 'items'), where('read', '==', false));
-  return onSnapshot(q, s => {
-    s.docs.forEach(d => updateDoc(d.ref, { read: true }));
-  });
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d => updateDoc(d.ref, { read: true })));
 };
 
 export const sendNotif = (toUid, data) =>
